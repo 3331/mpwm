@@ -1,9 +1,8 @@
 # mpwm - Multi Pointer Window Manager
 
-Based on [https://dwm.suckless.org/](dwm)
-
-mpwm is an extremely fast, small, and dynamic window manager which uses
-xinput2 to enable the use of multi pointer (MPX) for X.
+mpwm is originally based on [dwm](https://dwm.suckless.org/) and an
+extremely fast, small, and dynamic window manager which uses xinput2
+to enable the use of multi pointer (MPX) for X.
 
 ## Requirements
 
