@@ -6,7 +6,7 @@
  * events about window (dis-)appearance. Only one X connection at a time is
  * allowed to select for this event mask.
  *
- * The event handlers of dwm are organized in an array which is accessed
+ * The event handlers of mpwm are organized in an array which is accessed
  * whenever a new event has been fetched. This allows event dispatching
  * in O(1) time.
  *
@@ -2469,7 +2469,7 @@ updatebars(void)
         .background_pixmap = ParentRelative,
         .event_mask = ExposureMask
     };
-    XClassHint ch = {"dwm", "dwm"};
+    XClassHint ch = {"mpwm", "mpwm"};
     ptrevm.deviceid = XIAllMasterDevices;
     memset(ptrmask, 0, sizeof(ptrmask));
     XISetMask(ptrmask, XI_Motion);
@@ -2766,7 +2766,7 @@ xerror(Display *dpy, XErrorEvent *ee)
     || (ee->request_code == X_GrabKey && ee->error_code == BadAccess)
     || (ee->request_code == X_CopyArea && ee->error_code == BadDrawable))
         return 0;
-    fprintf(stderr, "dwm: fatal error: request code=%d, error code=%d\n",
+    fprintf(stderr, "mpwm: fatal error: request code=%d, error code=%d\n",
         ee->request_code, ee->error_code);
     return xerrorxlib(dpy, ee); /* may call exit */
 }
@@ -2782,7 +2782,7 @@ xerrordummy(Display * __attribute__((unused)) dpy, XErrorEvent * __attribute__((
 int
 xerrorstart(Display * __attribute__((unused)) dpy, XErrorEvent * __attribute__((unused)) ee)
 {
-    die("dwm: another window manager is already running");
+    die("mpwm: another window manager is already running");
     return -1;
 }
 
@@ -2801,8 +2801,8 @@ setup(void)
 	XSetWindowAttributes wa;
     Atom utf8string;
 
-    unlink("/home/user/.dwm.log");
-    log_fd = open("/home/user/.dwm.log", O_RDWR | O_CREAT, 0644);
+    unlink("/home/user/.mpwm.log");
+    log_fd = open("/home/user/.mpwm.log", O_RDWR | O_CREAT, 0644);
     if(log_fd == -1)
         die("could not open log_fd, why not..\n");
 
@@ -2884,13 +2884,13 @@ main(int argc, char *argv[])
 {
     int major = 2, minor = 1;
     if (argc == 2 && !strcmp("-v", argv[1]))
-        die("dwm-"VERSION);
+        die("mpwm-"VERSION);
     else if (argc != 1)
-        die("usage: dwm [-v]");
+        die("usage: mpwm [-v]");
     if (!setlocale(LC_CTYPE, "") || !XSupportsLocale())
         fputs("warning: no locale support\n", stderr);
     if (!(dpy = XOpenDisplay(NULL)))
-        die("dwm: cannot open display");
+        die("mpwm: cannot open display");
     if (!XQueryExtension(dpy, "XInputExtension", &xi2opcode, &(int){0}, &(int){0}))
         die("XInputExtension not available.\n");
     if (XIQueryVersion(dpy, &major, &minor) == BadRequest)
