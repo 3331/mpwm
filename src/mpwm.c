@@ -99,7 +99,8 @@ typedef struct {
 } Button;
 
 struct Client {
-    char name[256];
+    char name[64];
+    char prefix_name[256];
     float mina, maxa;
     int x, y, w, h;
     int oldx, oldy, oldw, oldh;
@@ -182,9 +183,9 @@ struct DevPair {
     Time lastevent;
     int lastdetail;
     Device* slaves;
-    DevPair* next;
-    DevPair* fnext;
-    DevPair* mnext;
+    DevPair* next; /* next devpair */
+    DevPair* fnext; /* next devpair that has same focus */
+    DevPair* mnext; /* next devpair that has same monitor */
 };
 
 typedef struct {
@@ -524,7 +525,6 @@ xi2buttonpress(void* ev)
     Arg arg = {0};
     Monitor* m;
     Client* c;
-    DBG("xi2buttonpress %d\n", e->deviceid);
     
     /* focus monitor if necessary */
     if ((m = wintomon(dp, e->event)) && m != dp->selmon) {
@@ -565,7 +565,6 @@ xi2buttonpress(void* ev)
 void
 xi2buttonrelease(void* ev)
 {
-    DBG("+ xi2buttonrelease\n");
     XIDeviceEvent* e = ev;
     DevPair* dp = getdevpair(e->deviceid);
     Client** pc;
@@ -663,7 +662,6 @@ cleanupmon(Monitor *m)
 void
 clientmessage(XEvent *e)
 {
-    DBG("+ clientmessage\n");
     XClientMessageEvent *cme = &e->xclient;
     Client *c = wintoclient(cme->window);
 
@@ -683,7 +681,6 @@ clientmessage(XEvent *e)
 void
 configure(Client *c)
 {
-    DBG("+ custom configure %ld\n", c->win);
     XConfigureEvent ce;
 
     ce.type = ConfigureNotify;
@@ -733,7 +730,6 @@ configurenotify(XEvent *e)
 void
 configurerequest(XEvent *e)
 {
-    DBG("+ configurerequest\n");
     Client *c;
     Monitor *m;
     XConfigureRequestEvent *ev = &e->xconfigurerequest;
@@ -814,7 +810,6 @@ expose(XEvent *e)
 void
 destroynotify(XEvent *e)
 {
-    DBG("+ destroynotify\n");
     Client *c;
     XDestroyWindowEvent *ev = &e->xdestroywindow;
 
@@ -865,12 +860,16 @@ dirtomon(DevPair* dp, int dir)
 void
 drawbar(Monitor* m)
 {
+    char focus_text[512];
+    int fti = 0, rfti = 0;
     int x, w, sw = 0;
     int boxs = drw->fonts->h / 9;
     int boxw = drw->fonts->h / 6 + 2;
     unsigned int i, occ = 0, urg = 0, selt = 0;
     Client *c;
     DevPair* dp;
+    DevPair* mdp;
+    DevPair* cdp;
 
     /* draw status first so it can be overdrawn by tags later */
     if (m->devices) {
@@ -903,15 +902,32 @@ drawbar(Monitor* m)
     drw_setscheme(drw, scheme[SchemeNorm]);
     x = drw_text(drw, x, 0, w, bh, lrpad / 2, m->ltsymbol, 0);
 
-    /* TODO: figure out something better so we know what is in focus, and the title of the window in focus */
+    /*
+     * 1  2  3  4  5  6  7  8  9  []=  [dev01,dev02] user@vm01: ~/Downloads | [dev03] user@vm01: ~
+    */
     if ((w = m->ww - sw - x) > bh) {
-        if (m->devstack && m->devstack->sel) {
+        focus_text[0] = 0;
+        for (c = m->clients, i = 0; c; c = c->next) {
+            if (!c->devices)
+                continue;
+            if (!i) {
+                if ((rfti = snprintf(&focus_text[fti], sizeof(focus_text) - fti, "%s - %s", c->prefix_name, c->name)) < 0)
+                    break;
+            }
+            else {
+                if ((rfti = snprintf(&focus_text[fti], sizeof(focus_text) - fti, " | %s - %s", c->prefix_name, c->name)) < 0)
+                    break;
+            }
+            fti += rfti;
+            i++;
+        }
+        if (m->devstack) {
             drw_setscheme(drw, scheme[CLAMP(SchemeNorm + m->devices, SchemeNorm, SchemeSel3)]);
-            drw_text(drw, x, 0, w, bh, lrpad / 2, m->devstack->sel->name, 0);
+            drw_text(drw, x, 0, w, bh, lrpad / 2, focus_text, 0);
         }
         else {
-			drw_setscheme(drw, scheme[SchemeNorm]);
-			drw_rect(drw, x, 0, w, bh, 1, 1);
+            drw_setscheme(drw, scheme[SchemeNorm]);
+            drw_rect(drw, x, 0, w, bh, 1, 1);
             drw_text(drw, x, 0, w, bh, lrpad / 2, "~", 0);
         }
     }
@@ -962,17 +978,14 @@ xi2enter(void *ev)
 void
 focus(DevPair* dp, Client *c)
 {
-    DBG("+ PRE focus\n");
 #ifdef DEBUG
     updatedebuginfo();
 #endif
     if ((!c || !ISVISIBLE(c)) && dp->selmon)
         for (c = dp->selmon->stack; c && !ISVISIBLE(c); c = c->snext);
-    DBG("+ focus maybe unfocus\n");
     if (dp->sel && dp->sel != c)
         unfocus(dp, dp->sel, 0);
     if (c) {
-        DBG("+ focus do it\n");
         if (c->mon != dp->selmon)
             setselmon(dp, c->mon);
         if (c->isurgent)
@@ -1000,7 +1013,6 @@ xi2focusin(void *ev)
 {
     XIFocusInEvent* e = ev;
     DevPair* dp = getdevpair(e->deviceid);
-    DBG("+ xi2focusin %ld\n", e->event);
     
     if (dp->sel && e->event != dp->sel->win)
         setfocus(dp, dp->sel);
@@ -1215,7 +1227,6 @@ isuniquegeom(XineramaScreenInfo *unique, size_t n, XineramaScreenInfo *info)
 void
 xi2keypress(void *ev)
 {
-    DBG("+ xi2keypress\n");
     XIDeviceEvent* e = ev;
     DevPair* dp = getdevpair(e->deviceid);
     unsigned int i;
@@ -1368,7 +1379,6 @@ killclient(DevPair* dp, const Arg *arg __attribute__((unused)))
 void
 manage(Window r, Window w, XWindowAttributes *wa)
 {
-    DBG("+ manage\n");
     Client *c, *t = NULL;
     Window trans = None;
     XWindowChanges wc;
@@ -1388,7 +1398,6 @@ manage(Window r, Window w, XWindowAttributes *wa)
     if ((XGetTransientForHint(dpy, w, &trans) && (t = wintoclient(trans))) ||
         (XGetTransientForHint(dpy, r, &trans) && (t = wintoclient(trans))) ||
         (XGetTransientForHint(dpy, wa->root, &trans) && (t = wintoclient(trans)))) {
-        DBG("first\n");
         c->mon = t->mon;
         c->tags = t->tags;
     } else if (spawnmon && spawndev) {
@@ -1447,7 +1456,6 @@ grabkeys(void)
 void
 mappingnotify(XEvent *e)
 {
-    DBG("+ mappingnotify\n");
     XMappingEvent *ev = &e->xmapping;
 
     XRefreshKeyboardMapping(ev);
@@ -1458,7 +1466,6 @@ mappingnotify(XEvent *e)
 void
 maprequest(XEvent *e)
 {
-    DBG("+ maprequest\n");
     static XWindowAttributes wa;
     XMapRequestEvent *ev = &e->xmaprequest;
 
@@ -1469,7 +1476,6 @@ maprequest(XEvent *e)
     if (!wintoclient(ev->window)) {
         manage(ev->parent, ev->window, &wa);
     }
-    DBG("- maprequest\n");
 }
 
 void
@@ -1642,7 +1648,6 @@ xi2motion(void *ev)
 void
 movemouse(DevPair* dp, const Arg * __attribute__((unused)) arg)
 {
-    DBG("+ movemouse\n");
     Client* c;
     if (!(c = dp->move.c) && !(c = dp->sel))
         return;
@@ -2000,16 +2005,48 @@ setmfact(DevPair* dp, const Arg *arg)
 }
 
 void
+format_client_prefix_name(Client* c)
+{
+    DevPair **tdp;
+    DevPair* dp;
+    int ri = 0, fi = 0;
+    int i;
+
+    if ((ri = snprintf(&c->prefix_name[fi], sizeof(c->prefix_name) - fi, "[")) < 0)
+        return;
+    fi += ri;
+    for (dp = c->devstack, i = 0; dp; dp = dp->fnext, i++) {
+        if(!i) {
+            if ((ri = snprintf(&c->prefix_name[fi], sizeof(c->prefix_name) - fi, "%d", dp->mptr->info.deviceid)) < 0)
+                return;
+        }
+        else {
+            if ((ri = snprintf(&c->prefix_name[fi], sizeof(c->prefix_name) - fi, ", %d", dp->mptr->info.deviceid)) < 0)
+                return;
+        }
+
+        fi += ri;
+    }
+
+    snprintf(&c->prefix_name[fi], sizeof(c->prefix_name) - fi, "]");
+}
+
+void
 setsel(DevPair* dp, Client* c, int dirty)
 {
     DevPair **tdp;
     DevPair* ndp;
 
+    if (dp->sel == c)
+        return;
+    
     if (dp->sel) {
         dp->sel->devices--;
         XSetWindowBorder(dpy, dp->sel->win, scheme[CLAMP(SchemeNorm + dp->sel->devices, SchemeNorm, SchemeSel3)][ColBorder].pixel);
         for (tdp = &dp->sel->devstack; *tdp && *tdp != dp; tdp = &(*tdp)->fnext);
         *tdp = dp->fnext;
+        dp->fnext = NULL;
+        format_client_prefix_name(dp->sel);
     }
     
     dp->sel = c;
@@ -2022,6 +2059,7 @@ setsel(DevPair* dp, Client* c, int dirty)
             ndp->fnext = dp;
         else
             dp->sel->devstack = dp;
+        format_client_prefix_name(dp->sel);
     }
     dp->dirty_sel = dirty;
 }
@@ -2039,6 +2077,7 @@ setselmon(DevPair* dp, Monitor* m)
         dp->selmon->devices--;
         for (tdp = &dp->selmon->devstack; *tdp && *tdp != dp; tdp = &(*tdp)->mnext);
         *tdp = dp->mnext;
+        dp->mnext = NULL;
     }
 
     dp->lastselmon = dp->selmon;
@@ -2415,8 +2454,6 @@ genericevent(XEvent *e)
     
     if (xi2handler[e->xcookie.evtype] && (cookie = XGetEventData(dpy, &e->xcookie)))
         xi2handler[e->xcookie.evtype](e->xcookie.data);
-    else
-        DBG("Unknown GenericEvent: %d\n", e->xcookie.evtype);
 
     if (cookie) {
         XFreeEventData(dpy, &e->xcookie);
@@ -2620,7 +2657,7 @@ updatestatus()
 {
     Monitor* m;
     if (!gettextprop(root, XA_WM_NAME, stext, sizeof(stext)))
-        strcpy(stext, "dwm-"VERSION);
+        strcpy(stext, "mpwm-"VERSION);
     for (m = mons; m; m = m->next)
 	    drawbar(m);
 }
