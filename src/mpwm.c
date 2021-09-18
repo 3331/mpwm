@@ -238,7 +238,7 @@ static void detachstack(Client* c);
 static void focus(DevPair* dp, Client* c);
 static void unfocus(DevPair* dp, Client* c, int setfocus);
 static void setfocus(DevPair* dp, Client *c);
-static void manage(Window r, Window w, XWindowAttributes *wa);
+static void manage(Window w, XWindowAttributes *wa);
 static void unmanage(Client *c, int destroyed);
 static void showhide(Client *c);
 static void updatesizehints(Client *c);
@@ -928,21 +928,10 @@ drawbar(Monitor* m)
         else {
             drw_setscheme(drw, scheme[SchemeNorm]);
             drw_rect(drw, x, 0, w, bh, 1, 1);
-            drw_text(drw, x, 0, w, bh, lrpad / 2, "~", 0);
+            drw_text(drw, x, 0, w, bh, lrpad / 2, "", 0);
         }
     }
-    /* Original code */
-	/*if ((w = m->ww - sw - x) > bh) {
-		if (m->sel) {
-			drw_setscheme(drw, scheme[m == selmon ? SchemeSel : SchemeNorm]);
-			drw_text(drw, x, 0, w, bh, lrpad / 2, m->sel->name, 0);
-			if (m->sel->isfloating)
-				drw_rect(drw, x + boxs, boxs, boxw, boxw, m->sel->isfixed, 0);
-		} else {
-			drw_setscheme(drw, scheme[SchemeNorm]);
-			drw_rect(drw, x, 0, w, bh, 1, 1);
-		}
-	}*/
+    
     drw_map(drw, m->barwin, 0, 0, m->ww, bh);
 }
 
@@ -1377,7 +1366,7 @@ killclient(DevPair* dp, const Arg *arg __attribute__((unused)))
 }
 
 void
-manage(Window r, Window w, XWindowAttributes *wa)
+manage(Window w, XWindowAttributes *wa)
 {
     Client *c, *t = NULL;
     Window trans = None;
@@ -1395,15 +1384,12 @@ manage(Window r, Window w, XWindowAttributes *wa)
     c->oldbw = wa->border_width;
 
     updatetitle(c);
-    if ((XGetTransientForHint(dpy, w, &trans) && (t = wintoclient(trans))) ||
-        (XGetTransientForHint(dpy, r, &trans) && (t = wintoclient(trans))) ||
-        (XGetTransientForHint(dpy, wa->root, &trans) && (t = wintoclient(trans)))) {
+    if (XGetTransientForHint(dpy, w, &trans) && (t = wintoclient(trans))) {
         c->mon = t->mon;
         c->tags = t->tags;
-    } else if (spawnmon && spawndev) {
-        c->mon = spawnmon;
-        applyrules(c);
-    } else if ((c->mon = anywintomon(w)) || (c->mon = anywintomon(r)) || (c->mon = anywintomon(wa->root))) {
+    } else if (spawndev && spawndev->selmon) {
+        c->mon = spawnmon ? spawnmon : spawndev->selmon;
+        spawnmon = NULL;
         applyrules(c);
     } else {
         die("could not find monitor for client\n");
@@ -1474,7 +1460,7 @@ maprequest(XEvent *e)
     if (wa.override_redirect)
         return;
     if (!wintoclient(ev->window)) {
-        manage(ev->parent, ev->window, &wa);
+        manage(ev->window, &wa);
     }
 }
 
@@ -1864,7 +1850,7 @@ scan(void)
             || wa.override_redirect || XGetTransientForHint(dpy, wins[i], &d1))
                 continue;
             if (wa.map_state == IsViewable || getstate(wins[i]) == IconicState) {
-                manage(root, wins[i], &wa);
+                manage(wins[i], &wa);
             }
         }
         for (i = 0; i < num; i++) { /* now the transients */
@@ -1872,7 +1858,7 @@ scan(void)
                 continue;
             if (XGetTransientForHint(dpy, wins[i], &d1)
             && (wa.map_state == IsViewable || getstate(wins[i]) == IconicState)) {
-                manage(root, wins[i], &wa);
+                manage(wins[i], &wa);
             }
         }
         if (wins)
@@ -2728,7 +2714,7 @@ anywintomon(Window w)
             return m;
         for (c = m->clients; c; c = c->next)
             if (c->win == w)
-            return c->mon;
+                return c->mon;
     }
     return NULL;
 }
@@ -2897,10 +2883,6 @@ main(int argc, char *argv[])
         die("XInput 2.0 not available. Server only supports %d.%d\n", major, minor);
     checkotherwm();
     setup();
-#ifdef __OpenBSD__
-    if (pledge("stdio rpath proc exec", NULL) == -1)
-        die("pledge");
-#endif /* __OpenBSD__ */
     scan();
     run();
     cleanup();
