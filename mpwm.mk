@@ -59,9 +59,9 @@ ${OBJDIR}/%.o: %.c | ${OBJDIRS} ${DEPDIRS}
 	@echo "${MSG_PREV_LINE}[${COL_GREEN}CC${COL_DEF}] $< => $@"
 
 install: all
-	mkdir -p "${DESTDIR}${PREFIX}/bin"
-	cp -fa "${TARGET}" "${DESTDIR}${PREFIX}/bin"
-	chmod 755 "${DESTDIR}${PREFIX}/bin/${TARGET}"
+	sudo mkdir -p "${DESTDIR}${PREFIX}/bin"
+	sudo cp -fa "${TARGET}" "${DESTDIR}${PREFIX}/bin"
+	sudo chmod 755 "${DESTDIR}${PREFIX}/bin/${TARGET}"
 
 uninstall:
 	rm -f "${DESTDIR}${PREFIX}/bin/${TARGET}"
