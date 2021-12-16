@@ -166,8 +166,8 @@ typedef struct Device Device;
 struct Device {
     DevPair* self;
     XIHierarchyInfo info;
-    Device* next;
-    Device* prev;
+    Device* snext; /* next slave */
+    Device* sprev; /* prev slave (not implemented) */
 };
 
 typedef struct Motion Motion;
@@ -639,7 +639,7 @@ cleanup(void)
     drw_free(drw);
     XSync(dpy, False);
     XISetFocus(dpy, XIAllMasterDevices, PointerRoot, CurrentTime);
-    XISetClientPointer(dpy, PointerRoot, XIAllMasterDevices);
+    XISetClientPointer(dpy, None, XIAllMasterDevices);
     XDeleteProperty(dpy, root, netatom[NetActiveWindow]);
 }
 
@@ -987,7 +987,7 @@ focus(DevPair* dp, Client *c)
         setfocus(dp, c);
     } else {
         XISetFocus(dpy, dp->mkbd->info.deviceid, root, CurrentTime);
-        XISetClientPointer(dpy, root, dp->mptr->info.deviceid);
+        XISetClientPointer(dpy, None, dp->mptr->info.deviceid);
         XDeleteProperty(dpy, root, netatom[NetActiveWindow]);
     }
     setsel(dp, c, False);
@@ -1236,6 +1236,7 @@ xi2hierarchychanged(void* ev)
 {
     DBG("+ xi2hierarchychanged\n");
     int i, x, y, idx;
+    DevPair **pdp;
     DevPair *dp;
     Device **pd;
     Device *d;
@@ -1247,7 +1248,6 @@ xi2hierarchychanged(void* ev)
 
     /* cache added devices */
     for(i = 0; i < e->num_info; i++) {
-        DBG("hmm: %d, %d, %d, %d\n", e->info[i].deviceid, e->info[i].attachment, e->info[i].use, e->info[i].flags);
         if (!(e->info[i].flags & (XIMasterAdded | XISlaveAdded)))
             continue;
         idx = e->info[i].deviceid;
@@ -1274,6 +1274,7 @@ xi2hierarchychanged(void* ev)
 
             *(deviceslots[idx].info.use == XIMasterPointer ? &dp->mptr : &dp->mkbd) = &deviceslots[idx];
             deviceslots[idx].self = dp;
+            DBG("add master: %d\n", idx);
         }
     }
 
@@ -1290,11 +1291,12 @@ xi2hierarchychanged(void* ev)
         if (e->info[i].flags & XISlaveDetached) {
             if (!(dp = getdevpair(deviceslots[idx].info.attachment)))
                 die("could not find device pair for slave device\n");
-            for (pd = &dp->slaves; *pd && *pd != &deviceslots[idx]; pd = &(*pd)->next);
-            *pd = deviceslots[idx].next;
+            for (pd = &dp->slaves; *pd && *pd != &deviceslots[idx]; pd = &(*pd)->snext);
+            *pd = deviceslots[idx].snext;
             deviceslots[idx].self = NULL;
-            deviceslots[idx].next = NULL;
-            deviceslots[idx].prev = NULL; /* TODO: not used yet... */
+            deviceslots[idx].snext = NULL;
+            deviceslots[idx].sprev = NULL; /* TODO: not used yet... */
+            DBG("detach slave: %d\n", idx);
         }
     }
 
@@ -1312,21 +1314,65 @@ xi2hierarchychanged(void* ev)
             if (!(dp = getdevpair(deviceslots[idx].info.attachment)))
                 die("could not find device pair for slave device\n");
             if (deviceslots[idx].self) {
-                for (pd = &deviceslots[idx].self->slaves; *pd && *pd != &deviceslots[idx]; pd = &(*pd)->next);
-                *pd = deviceslots[idx].next;
+                for (pd = &deviceslots[idx].self->slaves; *pd && *pd != &deviceslots[idx]; pd = &(*pd)->snext);
+                *pd = deviceslots[idx].snext;
                 deviceslots[idx].self = NULL;
-                deviceslots[idx].next = NULL;
-                deviceslots[idx].prev = NULL; /* TODO: not used yet... */
+                deviceslots[idx].snext = NULL;
+                deviceslots[idx].sprev = NULL; /* TODO: not used yet... */
             }
             if (!dp->slaves) {
                 d = &deviceslots[idx];
                 dp->slaves = d;
             } else {
-                for (d = dp->slaves; d && d->next; d = d->next);
-                d->next = &deviceslots[idx];
+                for (d = dp->slaves; d && d->snext; d = d->snext);
+                d->snext = &deviceslots[idx];
             }
+            DBG("added slave: %d\n", idx);
             deviceslots[idx].self = dp;
         }
+    }
+
+    /* uncache removed devices */
+    for(i = 0; i < e->num_info; i++) {
+        if (!(e->info[i].flags & (XIMasterRemoved | XISlaveRemoved)))
+            continue;
+        idx = e->info[i].deviceid;
+        
+        /* unset master pointer if removed */
+        if(deviceslots[idx].self && &deviceslots[idx] == deviceslots[idx].self->mptr)
+        {
+            DBG("remove mptr: %d\n", idx);
+            deviceslots[idx].self->mptr = NULL;
+        }
+        /* unset master keyboard if removed */
+        else if(deviceslots[idx].self && &deviceslots[idx] == deviceslots[idx].self->mkbd)
+        {
+            DBG("remove mkbd: %d\n", idx);
+            deviceslots[idx].self->mkbd = NULL;
+        }
+        else if(deviceslots[idx].self) /* slave removal */
+        {
+            DBG("remove slave: %d\n", idx);
+            for (pd = &deviceslots[idx].self->slaves; *pd && *pd != &deviceslots[idx]; pd = &(*pd)->snext);
+            *pd = deviceslots[idx].snext;
+            deviceslots[idx].self = NULL;
+            deviceslots[idx].snext = NULL;
+            deviceslots[idx].sprev = NULL; /* TODO: not used yet... */
+        }
+        
+        /* detach devpair from everything if mptr and mkbd is NULL */
+        if(deviceslots[idx].self && !deviceslots[idx].self->mptr && !deviceslots[idx].self->mkbd)
+        {
+            if(deviceslots[idx].self->slaves)
+            {
+                die("slaves still attached to devpair!\n");
+            }
+
+            removedevpair(deviceslots[idx].self);
+            deviceslots[idx].self = NULL;
+        }
+
+        memset(&deviceslots[idx], 0, sizeof(Device));
     }
 
     /* initialize device pairs */
@@ -1341,12 +1387,7 @@ xi2hierarchychanged(void* ev)
         updatedevpair(dp);
     }
 
-    /* uncache removed devices */
-    for(i = 0; i < e->num_info; i++) {
-        if (!(e->info[i].flags & (XIMasterRemoved | XISlaveRemoved)))
-            continue;
-        memset(&deviceslots[e->info[i].deviceid], 0, sizeof(Device));
-    }
+    DBG("- xi2hierarchychanged\n");
 }
 
 void
@@ -2097,16 +2138,10 @@ createdevpair(void)
 void
 removedevpair(DevPair* dp)
 {
-    /* TODO Implement this correctly */
     DevPair **pdp;
 
     setsel(dp, NULL, False);
     setselmon(dp, NULL);
-
-    /* detach all slave devices */
-
-    memset(dp->mptr, 0, sizeof(Device)); /* TODO: do we need to do anything about ->next on these? */
-    memset(dp->mkbd, 0, sizeof(Device));
 
     /* pop devpair from devpairs */
     for (pdp = &devpairs; *pdp && *pdp != dp; pdp = &(*pdp)->next);
@@ -2182,8 +2217,8 @@ initdevices(void)
             d = &deviceslots[i];
             dp->slaves = d;
         } else {
-            for (d = dp->slaves; d && d->next; d = d->next);
-            d->next = &deviceslots[i];
+            for (d = dp->slaves; d && d->snext; d = d->snext);
+            d->snext = &deviceslots[i];
         }
         deviceslots[i].self = dp;
     }
@@ -2245,7 +2280,7 @@ spawn(DevPair* dp, const Arg *arg)
             close(ConnectionNumber(dpy));
         setsid();
         execvp(((char **)arg->v)[0], (char **)arg->v);
-        fprintf(stderr, "dwm: execvp %s", ((char **)arg->v)[0]);
+        fprintf(stderr, "mpwm: execvp %s", ((char **)arg->v)[0]);
         perror(" failed");
         exit(EXIT_SUCCESS);
     }
@@ -2383,7 +2418,7 @@ unfocus(DevPair* dp, Client* c, int setfocus)
     grabbuttons(dp->mptr, c, 0);
     if (setfocus) {
         XISetFocus(dpy, dp->mkbd->info.deviceid, root, CurrentTime);
-        XISetClientPointer(dpy, root, dp->mptr->info.deviceid);
+        XISetClientPointer(dpy, None, dp->mptr->info.deviceid);
         XDeleteProperty(dpy, root, netatom[NetActiveWindow]);
     }
     setsel(dp, NULL, False);
@@ -2836,23 +2871,18 @@ setup(void)
     updatestatus();
     /* supporting window for NetWMCheck */
     wmcheckwin = XCreateSimpleWindow(dpy, root, 0, 0, 1, 1, 0, 0, 0);
-    XChangeProperty(dpy, wmcheckwin, netatom[NetWMCheck], XA_WINDOW, 32,
-        PropModeReplace, (unsigned char *) &wmcheckwin, 1);
-    XChangeProperty(dpy, wmcheckwin, netatom[NetWMName], utf8string, 8,
-        PropModeReplace, (unsigned char *) "dwm", 3);
-    XChangeProperty(dpy, root, netatom[NetWMCheck], XA_WINDOW, 32,
-        PropModeReplace, (unsigned char *) &wmcheckwin, 1);
+    XChangeProperty(dpy, wmcheckwin, netatom[NetWMCheck], XA_WINDOW, 32, PropModeReplace, (unsigned char *) &wmcheckwin, 1);
+    XChangeProperty(dpy, wmcheckwin, netatom[NetWMName], utf8string, 8, PropModeReplace, (unsigned char *) "mpwm", 3);
+    XChangeProperty(dpy, root, netatom[NetWMCheck], XA_WINDOW, 32, PropModeReplace, (unsigned char *) &wmcheckwin, 1);
     /* EWMH support per view */
-    XChangeProperty(dpy, root, netatom[NetSupported], XA_ATOM, 32,
-        PropModeReplace, (unsigned char *) netatom, NetLast);
+    XChangeProperty(dpy, root, netatom[NetSupported], XA_ATOM, 32, PropModeReplace, (unsigned char *) netatom, NetLast);
     XDeleteProperty(dpy, root, netatom[NetClientList]);
     /* set cursor on root window */
     XDefineCursor(dpy, root, cursor[CurNormal]->cursor);
     /* select events */
     memset(&wa, 0, sizeof(wa));
     wa.cursor = cursor[CurNormal]->cursor;
-	wa.event_mask = SubstructureRedirectMask|SubstructureNotifyMask
-		|StructureNotifyMask|PropertyChangeMask;
+	wa.event_mask = SubstructureRedirectMask | SubstructureNotifyMask | StructureNotifyMask | PropertyChangeMask;
 	XChangeWindowAttributes(dpy, root, CWEventMask|CWCursor, &wa);
     XSetWMProtocols(dpy, root, &wmatom[WMIgnoreEnter], 2);
 	XSelectInput(dpy, root, wa.event_mask);
@@ -2870,7 +2900,7 @@ main(int argc, char *argv[])
 {
     int major = 2, minor = 1;
     if (argc == 2 && !strcmp("-v", argv[1]))
-        die("mpwm-"VERSION);
+        die("mpwm-" VERSION);
     else if (argc != 1)
         die("usage: mpwm [-v]");
     if (!setlocale(LC_CTYPE, "") || !XSupportsLocale())
@@ -2886,6 +2916,7 @@ main(int argc, char *argv[])
     scan();
     run();
     cleanup();
+    dprintf(log_fd, "closing gracefully\n");
     close(log_fd);
     XCloseDisplay(dpy);
     return EXIT_SUCCESS;

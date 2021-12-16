@@ -1,5 +1,5 @@
 # mpwm version
-VERSION = 1
+VERSION = 1.1
 
 # Compiler/linker
 CC              := /usr/bin/clang-14
