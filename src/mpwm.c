@@ -584,7 +584,7 @@ xi2buttonrelease(void* ev)
                 resizemouse(dp, &(Arg){0});
                 break;
             case CurNormal:
-                XDefineCursor(dpy, (*pc)->win, cursor[CurNormal]->cursor);
+                XIDefineCursor(dpy, dp->mptr->info.deviceid, (*pc)->win, cursor[CurNormal]->cursor);
                 break;
         }
         if ((m = recttomon(dp, (*pc)->x, (*pc)->y, (*pc)->w, (*pc)->h)) != dp->selmon) {
@@ -638,8 +638,8 @@ cleanup(void)
     XDestroyWindow(dpy, wmcheckwin);
     drw_free(drw);
     XSync(dpy, False);
-    XISetFocus(dpy, XIAllMasterDevices, PointerRoot, CurrentTime);
-    XISetClientPointer(dpy, None, XIAllMasterDevices);
+    XISetFocus(dpy, XIAllMasterDevices, root, CurrentTime);
+    XISetClientPointer(dpy, root, XIAllMasterDevices);
     XDeleteProperty(dpy, root, netatom[NetActiveWindow]);
 }
 
@@ -987,7 +987,7 @@ focus(DevPair* dp, Client *c)
         setfocus(dp, c);
     } else {
         XISetFocus(dpy, dp->mkbd->info.deviceid, root, CurrentTime);
-        XISetClientPointer(dpy, None, dp->mptr->info.deviceid);
+        XISetClientPointer(dpy, root, dp->mptr->info.deviceid);
         XDeleteProperty(dpy, root, netatom[NetActiveWindow]);
     }
     setsel(dp, c, False);
@@ -1681,7 +1681,7 @@ movemouse(DevPair* dp, const Arg * __attribute__((unused)) arg)
     if (c->isfullscreen) /* no support moving fullscreen windows by mouse */
         return;
     restack(dp->selmon);
-    XDefineCursor(dpy, c->win, cursor[CurMove]->cursor);
+    XIDefineCursor(dpy, dp->mptr->info.deviceid, c->win, cursor[CurMove]->cursor);
     if (!dp->move.c)
         dp->move.c = dp->sel;
     dp->move.time = dp->lastevent;
@@ -1700,7 +1700,7 @@ resizemouse(DevPair* dp, const Arg * __attribute__((unused)) arg)
     if (c->isfullscreen) /* no support resizing fullscreen windows by mouse */
         return;
     restack(dp->selmon);
-    XDefineCursor(dpy, c->win, cursor[CurResize]->cursor);
+    XIDefineCursor(dpy, dp->mptr->info.deviceid, c->win, cursor[CurResize]->cursor);
     if (!dp->resize.c)
         dp->resize.c = dp->sel;
     dp->resize.time = dp->lastevent;
@@ -2413,12 +2413,13 @@ zoom(DevPair* dp, const Arg * __attribute__((unused)) arg)
 void
 unfocus(DevPair* dp, Client* c, int setfocus)
 {
-    if (!dp || !c || !dp->sel)
+    if (!dp || !dp->sel)
         return;
-    grabbuttons(dp->mptr, c, 0);
+    if(c)
+        grabbuttons(dp->mptr, c, 0);
     if (setfocus) {
         XISetFocus(dpy, dp->mkbd->info.deviceid, root, CurrentTime);
-        XISetClientPointer(dpy, None, dp->mptr->info.deviceid);
+        XISetClientPointer(dpy, root, dp->mptr->info.deviceid);
         XDeleteProperty(dpy, root, netatom[NetActiveWindow]);
     }
     setsel(dp, NULL, False);
