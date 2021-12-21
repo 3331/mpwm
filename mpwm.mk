@@ -37,7 +37,7 @@ INCLUDES        = -I/usr/include/freetype2
 DEPFLAGS        = -MT $@ -MMD -MP -MF ${DEPDIR}/$*.d
 CFLAGS          := -O3 -march=native -pedantic -Wall -Wextra -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_POSIX_C_SOURCE=2 -DVERSION=\"${VERSION}\" -DXINERAMA ${INCLUDES}
 CFLAGS_WARNINGS := -Wno-unused-function -Wno-pointer-to-int-cast -Wno-unused-variable -Wno-division-by-zero
-LDFLAGS         := -lX11 -lXi -lXinerama -lfontconfig -lXft
+LDFLAGS         := -lX11 -lXi -lXinerama -lfontconfig -lXft -lXrender
 
 .PHONY: all clean
 

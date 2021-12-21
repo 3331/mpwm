@@ -732,6 +732,7 @@ configurerequest(XEvent *e)
 {
     Client *c;
     Monitor *m;
+    int use_old_m = 1;
     XConfigureRequestEvent *ev = &e->xconfigurerequest;
     XWindowChanges wc;
 
@@ -742,11 +743,11 @@ configurerequest(XEvent *e)
             m = c->mon;
             if (ev->value_mask & CWX) {
                 c->oldx = c->x;
-                c->x = m->mx + ev->x;
+                c->x = ev->x;
             }
             if (ev->value_mask & CWY) {
                 c->oldy = c->y;
-                c->y = m->my + ev->y;
+                c->y = ev->y;
             }
             if (ev->value_mask & CWWidth) {
                 c->oldw = c->w;
@@ -756,10 +757,31 @@ configurerequest(XEvent *e)
                 c->oldh = c->h;
                 c->h = ev->height;
             }
-            if ((c->x + c->w) > m->mx + m->mw && c->isfloating)
+
+            // this is supposed to protect again moving a floating window completely out of bounds
+
+            for(m = mons; m; m = m->next) {
+                // client is at least halfway into a monitor, that monitor
+                // will be used for bounds checks
+                if ((c->x + (c->w / 2)) > m->mx &&
+                    (c->x + (c->w / 2)) < m->mx + m->mw &&
+                    c->isfloating)
+                {
+                    use_old_m = 0;
+                    break;
+                }
+            }
+            
+            if(use_old_m)
+            {
+                m = c->mon;
+            }
+
+            if ((c->x + c->bw) > m->mx + m->mw && c->isfloating)
                 c->x = m->mx + (m->mw / 2 - WIDTH(c) / 2); /* center in x direction */
-            if ((c->y + c->h) > m->my + m->mh && c->isfloating)
+            if ((c->y + c->bw) > m->my + m->mh && c->isfloating)
                 c->y = m->my + (m->mh / 2 - HEIGHT(c) / 2); /* center in y direction */
+
             if ((ev->value_mask & (CWX|CWY)) && !(ev->value_mask & (CWWidth|CWHeight)))
                 configure(c);
             if (ISVISIBLE(c))
@@ -967,9 +989,6 @@ xi2enter(void *ev)
 void
 focus(DevPair* dp, Client *c)
 {
-#ifdef DEBUG
-    updatedebuginfo();
-#endif
     if ((!c || !ISVISIBLE(c)) && dp->selmon)
         for (c = dp->selmon->stack; c && !ISVISIBLE(c); c = c->snext);
     if (dp->sel && dp->sel != c)
@@ -992,9 +1011,6 @@ focus(DevPair* dp, Client *c)
     }
     setsel(dp, c, False);
     drawbars();
-#ifdef DEBUG
-    updatedebuginfo();
-#endif
 }
 
 void
