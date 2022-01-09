@@ -532,6 +532,7 @@ xi2buttonpress(void* ev)
         setselmon(dp, m);
         focus(dp, NULL);
     }
+    
     if (e->event == dp->selmon->barwin) {
         i = x = 0;
         do
@@ -584,7 +585,7 @@ xi2buttonrelease(void* ev)
                 resizemouse(dp, &(Arg){0});
                 break;
             case CurNormal:
-                XIDefineCursor(dpy, dp->mptr->info.deviceid, (*pc)->win, cursor[CurNormal]->cursor);
+                XDefineCursor(dpy, (*pc)->win, cursor[CurNormal]->cursor);
                 break;
         }
         if ((m = recttomon(dp, (*pc)->x, (*pc)->y, (*pc)->w, (*pc)->h)) != dp->selmon) {
@@ -1032,6 +1033,7 @@ focusmon(DevPair* dp, const Arg *arg)
         return;
     if ((m = dirtomon(dp, arg->i)) == dp->selmon)
         return;
+    
     unfocus(dp, dp->sel, 0);
     setselmon(dp, m);
     focus(dp, NULL);
@@ -1697,7 +1699,7 @@ movemouse(DevPair* dp, const Arg * __attribute__((unused)) arg)
     if (c->isfullscreen) /* no support moving fullscreen windows by mouse */
         return;
     restack(dp->selmon);
-    XIDefineCursor(dpy, dp->mptr->info.deviceid, c->win, cursor[CurMove]->cursor);
+    XDefineCursor(dpy, c->win, cursor[CurMove]->cursor);
     if (!dp->move.c)
         dp->move.c = dp->sel;
     dp->move.time = dp->lastevent;
@@ -1716,7 +1718,7 @@ resizemouse(DevPair* dp, const Arg * __attribute__((unused)) arg)
     if (c->isfullscreen) /* no support resizing fullscreen windows by mouse */
         return;
     restack(dp->selmon);
-    XIDefineCursor(dpy, dp->mptr->info.deviceid, c->win, cursor[CurResize]->cursor);
+    XDefineCursor(dpy, c->win, cursor[CurResize]->cursor);
     if (!dp->resize.c)
         dp->resize.c = dp->sel;
     dp->resize.time = dp->lastevent;
@@ -2269,13 +2271,22 @@ showhide(Client *c)
 {
     if (!c)
         return;
-    if (ISVISIBLE(c)) {
+    if (ISVISIBLE(c))
+    {
         /* show clients top down */
         XMoveWindow(dpy, c->win, c->x, c->y);
-        if ((!c->mon->lt[c->mon->sellt]->arrange || c->isfloating) && !c->isfullscreen)
+        if ((!c->mon->lt[c->mon->sellt]->arrange || c->isfloating))
+        {
             resize(c, c->x, c->y, c->w, c->h, 0);
+            if (c->isfullscreen)
+            {
+                setfullscreen(c, 1);
+            }
+        }
         showhide(c->snext);
-    } else {
+    }
+    else
+    {
         /* hide clients bottom up */
         showhide(c->snext);
         XMoveWindow(dpy, c->win, WIDTH(c) * -2, c->y);
