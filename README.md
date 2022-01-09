@@ -4,6 +4,21 @@ mpwm is based on [dwm](https://dwm.suckless.org/) and an
 extremely fast, small, and dynamic window manager which uses xinput2
 to enable the use of multi pointer (MPX) for X.  
 
+## Features/patches
+
+* Proper multi cursor support with XInput2
+  * Multiple cursor/keyboard pairs can have focus on 1 window
+  * Limit only 1 pointer/keyboard pair to have focus on an application at a time **TODO**
+  * Create new master device pair **TODO**
+  * Cycle already existing devices to other masters **TODO**
+  * Remove master device pair **TODO**
+* Improved fullscreen support with multi monitors
+  * Move fullscreen applications to other screens with keyboard (MODKEY + .) or (MODKEY + ,)
+  * Move fullscreen applications to other screens with mouse (MODKEY|ShiftMask + Button1) **TODO**
+  * Toggle visibility of fullscreen and floating windows **TODO**
+* [centeredmaster](https://dwm.suckless.org/patches/centeredmaster/) (MODKEY + o)
+* [rmaster](https://dwm.suckless.org/patches/rmaster/) (MODKEY + r)
+
 ## Requirements
 
 In order to build mpwm you need the Xlib header files.
