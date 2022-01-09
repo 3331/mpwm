@@ -10,7 +10,7 @@
 
 ## Bugs
 
-* Bar keeps name of a fullscreen application after moving it away from monitor without other windows
+* Bar window keeps name of application after moving it away from monitor without other windows
 * Unknown bug where firefox and other windows suddenly resize as if they are alone on a monitor
 * Windows that open as floating should be moved to the middle of parent window instead of 0,0 on same monitor
 * Click on floating window should bring it to foreground (probably something to do with restack function)
