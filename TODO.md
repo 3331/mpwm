@@ -2,7 +2,7 @@
 
 ## Other things/features
 
-* Split into more c files, honestly a mess to navigate in 1 big file when we could have separation of monitors and clients and commands
+* Split into more c files, honestly a mess to navigate in 1 big file when we could have separation of monitors and windows and commands
 * Allow moving fullscreen windows with mouse
 
 ## Bugs
@@ -14,4 +14,4 @@
 * Fade SchemeSel color for how many devices are focused instead of this manual thing
 * Change border color based on index in the stack
 * Add tail pointer to stack and other lists, could save a lot of resources on just going to tail instead of iterating through everything first
-* Add toggle to hide floating/fullscreen clients
+* Add toggle to hide floating and fullscreen windows
