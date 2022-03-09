@@ -6,6 +6,10 @@ to enable the use of multi pointer (MPX) for X.
 
 ## Features/patches
 
+* Intuitive (MODKEY + TAB) behaviour
+  * Cycle through stack and watch windows move around
+  * Combined with (ControlMask) it will cycle through tags instead of clients **TODO**
+  * Combined either tag/client cycling with (ShiftMask) and it will cycle backwards
 * Proper multi cursor support with XInput2
   * Multiple cursor/keyboard pairs can have focus on 1 window
   * Limit only 1 pointer/keyboard pair to have focus on an application at a time **TODO**
