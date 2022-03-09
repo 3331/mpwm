@@ -515,6 +515,11 @@ void
 append(Client *c)
 {
     Client* tc;
+    if(!c->mon->clients)
+    {
+        c->mon->clients = c;
+        return;
+    }
 	for (tc = c->mon->clients; tc->next; tc = tc->next)
     ;
     tc->next = c;
@@ -859,6 +864,7 @@ detach(Client *c)
 
     for (tc = &c->mon->clients; *tc && *tc != c; tc = &(*tc)->next);
     *tc = c->next;
+    c->next = NULL;
 }
 
 void
@@ -1089,7 +1095,6 @@ cyclestack(DevPair* dp, const Arg * arg)
 
     if (!dp || !dp->sel || !dp->selmon || (dp->sel->isfullscreen && lockfullscreen))
         return;
-
 
     focusstack(dp, arg);
 
