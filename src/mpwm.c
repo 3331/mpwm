@@ -1928,8 +1928,10 @@ scan(void)
 void
 sendmon(DevPair* dp, Client* c, Monitor* m)
 {
-    if (c->mon == m)
+    Monitor* prev_m = c->mon;
+    if (prev_m == m)
         return;
+
     unfocus(dp, c, 1);
     detach(c);
     detachstack(c);
@@ -1941,7 +1943,8 @@ sendmon(DevPair* dp, Client* c, Monitor* m)
         if (dp->dirty_sel)
             focus(dp, NULL);
     
-    arrange(NULL);
+    arrange(prev_m);
+    arrange(m);
 }
 
 void
