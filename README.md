@@ -61,6 +61,9 @@ In order to display status info in the bar, you can do something
 like this in your .xinitrc:
 
 ```text
+picom &
+eval "$(hsetroot -solid '#000000')"
+eval "$(dbus-launch --sh-syntax --exit-with-session)"
 while xsetroot -name "`date` `uptime | sed 's/.*,//'`"
 do
     sleep 1
