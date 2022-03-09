@@ -200,6 +200,7 @@ typedef struct {
 /* function declarations (commandable) */
 static void focusmon(DevPair* dp, const Arg *arg);
 static void focusstack(DevPair* dp, const Arg *arg);
+static void cyclestack(DevPair* dp, const Arg *arg);
 static void incnmaster(DevPair* dp, const Arg *arg);
 static void killclient(DevPair* dp, const Arg *arg);
 static void movemouse(DevPair* dp, const Arg *arg);
@@ -231,6 +232,7 @@ static void resizeclient(Client *c, int x, int y, int w, int h);
 static int applysizehints(Client *c, int *x, int *y, int *w, int *h, int interact);
 static void applyrules(Client *c);
 static void attach(Client *c);
+static void append(Client *c);
 static void attachstack(Client *c);
 static void configure(Client *c);
 static void detach(Client *c);
@@ -507,6 +509,16 @@ attach(Client *c)
 {
     c->next = c->mon->clients;
     c->mon->clients = c;
+}
+
+void
+append(Client *c)
+{
+    Client* tc;
+	for (tc = c->mon->clients; tc->next; tc = tc->next)
+    ;
+    tc->next = c;
+    c->next = NULL;
 }
 
 void
@@ -1046,6 +1058,7 @@ focusstack(DevPair* dp, const Arg *arg)
 
     if (!dp || !dp->sel || !dp->selmon || (dp->sel->isfullscreen && lockfullscreen))
         return;
+
     if (arg->i > 0) {
         for (c = dp->sel->next; c && !ISVISIBLE(c); c = c->next);
         if (!c)
@@ -1062,6 +1075,41 @@ focusstack(DevPair* dp, const Arg *arg)
     if (c) {
         focus(dp, c);
         restack(dp->selmon);
+    }
+}
+
+void
+cyclestack(DevPair* dp, const Arg * arg)
+{
+    Client* c;
+
+    /* TODO: hide fullscreen apps instead and show something somewhere
+     * so user knows if theres a fullscreen app in the background
+    */
+
+    if (!dp || !dp->sel || !dp->selmon || (dp->sel->isfullscreen && lockfullscreen))
+        return;
+
+
+    focusstack(dp, arg);
+
+    if (arg->i > 0)
+    {
+        c = dp->selmon->clients;
+        detach(c);
+        append(c);
+    }
+    else
+    {
+        for (c = dp->selmon->clients; c->next; c = c->next)
+        ;
+        detach(c);
+        attach(c);
+    }
+
+    if (dp->sel) {
+        focus(dp, dp->sel);
+        arrange(dp->selmon);
     }
 }
 
