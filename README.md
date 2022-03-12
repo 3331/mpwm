@@ -4,6 +4,10 @@ mpwm is based on [dwm](https://dwm.suckless.org/) and a
 fast, small, and dynamic window manager which uses xinput2
 to enable the use of multi pointer (MPX) for X.  
 
+Currently there is no bindings for creating/managing device pairs.  
+
+Use `xinput` for multi pointer adventures for now.  
+
 ## Features/patches
 
 * Intuitive (MODKEY + TAB) behaviour
