@@ -10,15 +10,17 @@ Use `xinput` for multi pointer adventures for now.
 
 ## Features/patches
 
+* **TODO** Split into more c files, it is currently a mess to navigate the code
+
 * Intuitive (MODKEY + TAB) behaviour
-  * Cycle through stack and watch windows move around
+  * Cycle through stack and watch windows move around (MODKEY + TAB)
   * **TODO** Combined with (ControlMask) it will cycle through tags instead of clients
-  * Combined either tag/client cycling with (ShiftMask) and it will cycle backwards
+  * Combining client/tag cycling bindings with (ShiftMask) will change cycle direction to back
 * Proper multi cursor support with XInput2
   * Multiple cursor/keyboard pairs can have focus on 1 window
   * **TODO** Limit only 1 pointer/keyboard pair to have focus on an application at a time
-  * **TODO** Create new master device pair
   * **TODO** Cycle already existing devices to other masters
+  * **TODO** Create new master device pair
   * **TODO** Remove master device pair
 * Improved fullscreen support with multi monitors
   * Swap entire monitor with next/prev monitor (MODKEY|ShiftMask|ControlMask + .) or (MODKEY|ShiftMask|ControlMask + ,)
