@@ -17,10 +17,10 @@ to enable the use of multi pointer (MPX) for X.
   * Cycle already existing devices to other masters **TODO**
   * Remove master device pair **TODO**
 * Improved fullscreen support with multi monitors
+  * Swap entire monitor with next/prev monitor (MODKEY|ShiftMask|ControlMask + .) or (MODKEY|ShiftMask|ControlMask + ,)
   * Move fullscreen applications to other screens with keyboard (MODKEY + .) or (MODKEY + ,)
   * Move fullscreen applications to other screens with mouse (MODKEY|ShiftMask + Button1) **TODO**
   * Toggle visibility of fullscreen and floating windows (MODKEY|ShiftMask + f) **TODO**
-  * Toggle fullscreen of an existing window (MODKEY + f) **TODO**
 * [centeredmaster](https://dwm.suckless.org/patches/centeredmaster/) (MODKEY + o)
 * [rmaster](https://dwm.suckless.org/patches/rmaster/) (MODKEY + r)
 

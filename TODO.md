@@ -6,15 +6,16 @@
 * Limit only 1 pointer/keyboard pair to have focus on an application at a time
 * Toggle visibility of fullscreen and floating windows
 * Allow moving fullscreen windows with mouse
-* Tags should have their own individual layouts/spacings rmaster etc.
+* Dynamic SchemeSel color for how many devices are focused instead of this manual thing
 
 ## Bugs
 
-* Empty screen disables ctrl + ,/. (change focus to different monitor) (bug that needs to be triggered maybe?)
 * Battle.net and their games steal focus sometimes and its very annoying, is this something wrong with the wm?
 * Unknown bug where firefox and other windows suddenly resize as if they are alone on a monitor
-* Windows that open as floating should be moved to the middle of parent window instead of 0,0 on same monitor
 * Click on floating window should bring it to foreground (probably something to do with restack function)
 * Right clicking on barwin fish/tile/monocle item should cycle -1, and left click should cycle +1 through all modes
-* Dynamic SchemeSel color for how many devices are focused instead of this manual thing
-* Change border color based on index in the stack
+
+## Maybe fixed
+
+* Empty screen disables MODKEY + ,/. (change focus to different monitor) (bug that needs to be triggered maybe?)
+* Windows that open as floating should be moved to the middle of parent window instead of 0,0 on same monitor
