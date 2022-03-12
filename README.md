@@ -57,8 +57,8 @@ DISPLAY=foo.bar:1 exec mpwm
 
 (This will start mpwm on display :1 of the host foo.bar.)
 
-In order to display status info in the bar, you can do something
-like this in your .xinitrc:
+In order to display status info in the bar, and enable other fancy stuff
+such as hyperlinks and opacity, you can do something like this in your .xinitrc:
 
 ```text
 picom &
