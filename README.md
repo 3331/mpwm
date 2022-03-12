@@ -8,19 +8,19 @@ to enable the use of multi pointer (MPX) for X.
 
 * Intuitive (MODKEY + TAB) behaviour
   * Cycle through stack and watch windows move around
-  * Combined with (ControlMask) it will cycle through tags instead of clients **TODO**
+  * **TODO** Combined with (ControlMask) it will cycle through tags instead of clients
   * Combined either tag/client cycling with (ShiftMask) and it will cycle backwards
 * Proper multi cursor support with XInput2
   * Multiple cursor/keyboard pairs can have focus on 1 window
-  * Limit only 1 pointer/keyboard pair to have focus on an application at a time **TODO**
-  * Create new master device pair **TODO**
-  * Cycle already existing devices to other masters **TODO**
-  * Remove master device pair **TODO**
+  * **TODO** Limit only 1 pointer/keyboard pair to have focus on an application at a time
+  * **TODO** Create new master device pair
+  * **TODO** Cycle already existing devices to other masters
+  * **TODO** Remove master device pair
 * Improved fullscreen support with multi monitors
   * Swap entire monitor with next/prev monitor (MODKEY|ShiftMask|ControlMask + .) or (MODKEY|ShiftMask|ControlMask + ,)
   * Move fullscreen applications to other screens with keyboard (MODKEY + .) or (MODKEY + ,)
-  * Move fullscreen applications to other screens with mouse (MODKEY|ShiftMask + Button1) **TODO**
-  * Toggle visibility of fullscreen and floating windows (MODKEY|ShiftMask + f) **TODO**
+  * **TODO** Move fullscreen applications to other screens with mouse (MODKEY|ShiftMask + Button1)
+  * **TODO** Toggle visibility of fullscreen and floating windows (MODKEY|ShiftMask + f)
 * [centeredmaster](https://dwm.suckless.org/patches/centeredmaster/) (MODKEY + o)
 * [rmaster](https://dwm.suckless.org/patches/rmaster/) (MODKEY + r)
 
