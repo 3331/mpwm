@@ -99,6 +99,10 @@ typedef struct {
 } Button;
 
 struct Client {
+    Client* next;
+    Client* snext;
+    Monitor* mon;
+    DevPair* devstack;
     char name[64];
     char prefix_name[256];
     float mina, maxa;
@@ -110,10 +114,6 @@ struct Client {
     int grabbed;
     int isfixed, isfloating, isurgent, neverfocus, oldstate, isfullscreen;
     int devices;
-    DevPair* devstack;
-    Client* next;
-    Client* snext;
-    Monitor* mon;
     Window win;
 };
 
@@ -130,6 +130,11 @@ typedef struct {
 } Layout;
 
 struct Monitor {
+    Monitor* next;
+    Monitor* prev;
+    Client* clients;
+    Client* stack;
+    DevPair* devstack;
     char ltsymbol[16];
     float mfact;
     uint32_t nmaster;
@@ -143,11 +148,6 @@ struct Monitor {
     int showbar;
     int topbar;
     int rmaster;
-    Client* clients;
-    Client* stack;
-    DevPair* devstack;
-    Monitor* next;
-    Monitor* prev;
     int devices;
     Window barwin;
     const Layout *lt[2];
@@ -173,20 +173,20 @@ struct Device {
 
 typedef struct Motion Motion;
 struct DevPair {
+    DevPair* next; /* next devpair */
+    DevPair* fnext; /* next devpair that has same focus */
+    DevPair* mnext; /* next devpair that has same monitor */
+    Monitor* selmon;
+    Monitor* lastselmon;
+    Device* slaves;
     Device* mptr;
     Device* mkbd;
     Bool dirty_sel;
     Client* sel;
-    Monitor* selmon;
-    Monitor* lastselmon;
     Motion resize;
     Motion move;
     Time lastevent;
     int lastdetail;
-    Device* slaves;
-    DevPair* next; /* next devpair */
-    DevPair* fnext; /* next devpair that has same focus */
-    DevPair* mnext; /* next devpair that has same monitor */
 };
 
 typedef struct {
