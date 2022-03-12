@@ -11,3 +11,6 @@
 
 void die(const char *fmt, ...);
 void *ecalloc(size_t nmemb, size_t size);
+
+void swap_int(int* a, int* b);
+void swap_ulong(unsigned long* a, unsigned long* b);

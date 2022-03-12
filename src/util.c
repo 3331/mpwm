@@ -37,3 +37,19 @@ die(const char *fmt, ...) {
 	close(log_fd);
 	exit(1);
 }
+
+void inline
+swap_int(int* a, int* b)
+{
+	int tmp = *a;
+	*a = *b;
+	*b = tmp;
+}
+
+void inline
+swap_ulong(unsigned long* a, unsigned long* b)
+{
+	unsigned long tmp = *a;
+	*a = *b;
+	*b = tmp;
+}
