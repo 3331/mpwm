@@ -147,6 +147,7 @@ struct Monitor {
     Client* stack;
     DevPair* devstack;
     Monitor* next;
+    Monitor* prev;
     int devices;
     Window barwin;
     const Layout *lt[2];
@@ -199,6 +200,7 @@ typedef struct {
 
 /* function declarations (commandable) */
 static void focusmon(DevPair* dp, const Arg *arg);
+static void swapmon(DevPair* dp, const Arg *arg);
 static void focusstack(DevPair* dp, const Arg *arg);
 static void cyclestack(DevPair* dp, const Arg *arg);
 static void incnmaster(DevPair* dp, const Arg *arg);
@@ -265,6 +267,8 @@ static void arrangemon(Monitor *m);
 static void drawbar(Monitor *m);
 static void restack(Monitor* m);
 static void updatebarpos(Monitor *m);
+static void insertmon(Monitor* at, Monitor* m);
+static void unlinkmon(Monitor* m);
 static void cleanupmon(Monitor *m);
 static void sendmon(DevPair* dp, Client* c, Monitor* m);
 
@@ -359,7 +363,7 @@ static Cur *cursor[CurLast];
 static Clr **scheme;
 static Display *dpy;
 static Drw *drw;
-static Monitor* mons, *spawnmon;
+static Monitor* mons, *mons_end, *spawnmon;
 static DevPair* devpairs,* spawndev;
 static Device* floatingdevs;
 static Window root, wmcheckwin;
@@ -662,16 +666,54 @@ cleanup(void)
 }
 
 void
+insertmon(Monitor* at, Monitor* m)
+{
+    if(!at && mons) /* infront of mons */
+    {
+        mons->prev = m;
+        m->next = mons;
+        mons = m;
+    }
+    else if (at) /* at */
+    {
+        m->next = at->next;
+        m->prev = at;
+        
+        if (at->next)
+            at->next->prev = m;
+        at->next = m;
+    }
+    else /* fresh */
+        mons = m;
+    
+    if(!m->next)
+        mons_end = m;
+}
+
+void
+unlinkmon(Monitor* m)
+{
+    if(m->next)
+        m->next->prev = m->prev;
+    else
+        mons_end = m->prev;
+    
+    if(m->prev)
+        m->prev->next = m->next;
+    else
+        mons = m->next;
+    
+    m->next = NULL;
+    m->prev = NULL;
+}
+
+void
 cleanupmon(Monitor *m)
 {
 	Monitor *mon;
 
-	if (m == mons) {
-		mons = mons->next;
-    } else {
-		for (mon = mons; mon && mon->next != mon; mon = m->next);
-		mon->next = m->next;
-	}
+    unlinkmon(m);
+
 	XUnmapWindow(dpy, m->barwin);
 	XDestroyWindow(dpy, m->barwin);
 	free(m);
@@ -888,13 +930,16 @@ dirtomon(DevPair* dp, int dir)
 {
     Monitor* m = NULL;
 
-    if (dir > 0) {
+    if (dir > 0)
+    {
         if (!(m = dp->selmon->next))
             m = mons;
-    } else if (dp->selmon == mons)
-        for (m = mons; m->next; m = m->next);
+    }
     else
-        for (m = mons; m->next != dp->selmon; m = m->next);
+    {
+        if (!(m = dp->selmon->prev))
+            m = mons_end;
+    }
     return m;
 }
 
@@ -912,6 +957,9 @@ drawbar(Monitor* m)
     DevPair* mdp;
     DevPair* cdp;
 
+    if (!m->showbar)
+        return;
+    
     /* draw status first so it can be overdrawn by tags later */
     if (m->devices) {
         drw_setscheme(drw, scheme[SchemeNorm]);
@@ -1058,6 +1106,69 @@ focusmon(DevPair* dp, const Arg *arg)
 }
 
 void
+swapmon(DevPair* dp, const Arg *arg)
+{
+    Monitor* tar;
+
+    if (!mons->next)
+        return;
+    if ((tar = dirtomon(dp, arg->i)) == dp->selmon)
+        return;
+    
+    Monitor* cur = dp->selmon;
+
+    if (arg->i > 0)
+    {
+        if(cur->next)
+        {
+            unlinkmon(cur);
+            insertmon(tar, cur);
+        }
+        else
+        {
+            unlinkmon(cur);
+            unlinkmon(tar);
+            insertmon(NULL, cur);
+            insertmon(mons_end, tar);
+        }
+    }
+    else
+    {
+        if(tar->next)
+        {
+            unlinkmon(tar);
+            insertmon(cur, tar);
+        }
+        else
+        {
+            unlinkmon(tar);
+            unlinkmon(cur);
+            insertmon(NULL, tar);
+            insertmon(mons_end, cur);
+        }
+    }
+
+    unfocus(dp, dp->sel, 0);
+
+    swap_ulong(&cur->barwin, &tar->barwin);
+    swap_int(&cur->num, &tar->num);
+    swap_int(&cur->by, &tar->by);
+    swap_int(&cur->mx, &tar->mx);
+    swap_int(&cur->my, &tar->my);
+    swap_int(&cur->mw, &tar->mw);
+    swap_int(&cur->mh, &tar->mh);
+    swap_int(&cur->wx, &tar->wx);
+    swap_int(&cur->wy, &tar->wy);
+    swap_int(&cur->ww, &tar->ww);
+    swap_int(&cur->wh, &tar->wh);
+    
+    setselmon(dp, tar);
+    focus(dp, NULL);
+    arrange(tar);
+    arrange(cur);
+}
+
+void
 focusstack(DevPair* dp, const Arg *arg)
 {
     Client *c = NULL, *i;
@@ -1106,8 +1217,7 @@ cyclestack(DevPair* dp, const Arg * arg)
     }
     else
     {
-        for (c = dp->selmon->clients; c->next; c = c->next)
-        ;
+        for (c = dp->selmon->clients; c->next; c = c->next);
         detach(c);
         attach(c);
     }
@@ -2643,13 +2753,7 @@ updategeom(DevPair* dp)
         nn = j;
         if (n <= nn) { /* new monitors available */
             for (i = 0; i < (nn - n); i++) {
-                if (!mons)
-                    mons = createmon();
-                else {
-                    for (m = mons; m && m->next; m = m->next);
-                    if (m)
-                        m->next = createmon();
-                }
+                insertmon(mons_end, createmon());
             }
             for (i = 0, m = mons; i < nn && m; m = m->next, i++)
                 if (i >= n
@@ -2666,26 +2770,26 @@ updategeom(DevPair* dp)
                 }
         } else { /* less monitors available nn < n */
             for (i = nn; i < n; i++) {
-                for (m = mons; m && m->next; m = m->next);
                 while ((c = m->clients)) {
                     dirty = 1;
-                    m->clients = c->next;
+                    mons_end->clients = c->next;
                     detachstack(c);
                     c->mon = mons;
                     attach(c);
                     attachstack(c);
                 }
-                if (dp && m == dp->selmon)
+                if (dp && mons_end == dp->selmon)
                     setselmon(dp, mons);
-                cleanupmon(m);
+                cleanupmon(mons_end);
             }
         }
         free(unique);
     } else
 #endif /* XINERAMA */
     { /* default monitor setup */
-        if (!mons)
-            mons = createmon();
+        if (!mons) {
+            insertmon(mons_end, createmon());
+        }
         if (mons->mw != sw || mons->mh != sh) {
             dirty = 1;
             mons->mw = mons->ww = sw;
@@ -2915,6 +3019,9 @@ setup(void)
     sigchld(0);
     
     /* init screen */
+    mons = NULL;
+    mons_end = NULL;
+    spawnmon = NULL;
     screen = DefaultScreen(dpy);
     sw = DisplayWidth(dpy, screen);
     sh = DisplayHeight(dpy, screen);
