@@ -2459,20 +2459,37 @@ showhide(Client *c)
 void
 spawn(DevPair* dp, const Arg *arg)
 {
+    pid_t pid1;
+    pid_t pid2;
+    int status;
+
     if(!dp->selmon)
         return;
     if (arg->v == dmenucmd)
         dmenumon[0] = '0' + dp->selmon->num;
+    
     spawnmon = dp->selmon;
     spawndev = dp;
-    if (fork() == 0) {
+
+    if ((pid1 = fork())) {
+        waitpid(pid1, &status, 0);
+    }
+    else
+    {
         if (dpy)
             close(ConnectionNumber(dpy));
-        setsid();
-        execvp(((char **)arg->v)[0], (char **)arg->v);
-        fprintf(stderr, "mpwm: execvp %s", ((char **)arg->v)[0]);
-        perror(" failed");
-        exit(EXIT_SUCCESS);
+        if (fork())
+        {
+            exit(0);
+        }
+        else
+        {
+            setsid();
+            execvp(((char **)arg->v)[0], (char **)arg->v);
+            fprintf(stderr, "mpwm: execvp %s", ((char **)arg->v)[0]);
+            perror(" failed");
+            exit(EXIT_SUCCESS);
+        }
     }
 }
 
