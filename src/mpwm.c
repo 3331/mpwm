@@ -3027,10 +3027,12 @@ setup(void)
     XSetWindowAttributes wa;
     Atom utf8string;
 
+#ifdef DEBUG
     unlink("/home/user/.mpwm.log");
     log_fd = open("/home/user/.mpwm.log", O_RDWR | O_CREAT, 0644);
     if(log_fd == -1)
         die("could not open log_fd, why not..\n");
+#endif
 
     /* clean up any zombies immediately */
     sigchld(0);
