@@ -2979,7 +2979,9 @@ wintomon(DevPair* dp, Window w)
 int
 xerror(Display *dpy, XErrorEvent *ee)
 {
+    DBG("xerror: request code=%d, error code=%d\n", ee->request_code, ee->error_code);
     if (ee->error_code == BadWindow
+    || (ee->request_code == xi2opcode && ee->error_code == BadMatch)
     || (ee->request_code == X_SetInputFocus && ee->error_code == BadMatch)
     || (ee->request_code == X_PolyText8 && ee->error_code == BadDrawable)
     || (ee->request_code == X_PolyFillRectangle && ee->error_code == BadDrawable)
@@ -2991,6 +2993,7 @@ xerror(Display *dpy, XErrorEvent *ee)
         return 0;
     fprintf(stderr, "mpwm: fatal error: request code=%d, error code=%d\n",
         ee->request_code, ee->error_code);
+    
     return xerrorxlib(dpy, ee); /* may call exit */
 }
 
