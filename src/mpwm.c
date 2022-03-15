@@ -2101,10 +2101,8 @@ sendmon(DevPair* dp, Client* c, Monitor* m)
     c->tags = m->tagset[m->seltags]; /* assign tags of target monitor */
     attach(c);
     attachstack(c);
-    for (dp = devpairs; dp; dp = dp->next)
-        if (dp->dirty_sel)
-            focus(dp, NULL);
-    
+
+    focus(dp, NULL);
     arrange(prev_m);
     arrange(m);
 }
