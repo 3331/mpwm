@@ -8,6 +8,9 @@ release:
 debug:
 	@${MAKE} -f ${MPWM} debug BUILD_TYPE=Debug
 
+debug-install:
+	@${MAKE} -f ${MPWM} debug install BUILD_TYPE=Debug
+
 install:
 	@${MAKE} -f ${MPWM} install
 
