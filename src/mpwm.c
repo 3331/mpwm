@@ -585,6 +585,34 @@ xi2buttonpress(void* ev)
 }
 
 void
+postmoveselmon(DevPair* dp, Client* c)
+{
+    Monitor* m;
+    int x, y;
+
+    if(!c->isfloating)
+        return;
+    
+    if(c->isfullscreen)
+    {
+        if(!getrootptr(dp, &x, &y))
+            return;
+        if(!(m = recttomon(dp, x, y, 1, 1)))
+            return;
+    }
+    else
+        if (!(m = recttomon(dp, c->x, c->y, c->w, c->h)))
+            return;
+    
+    if(dp->selmon != m)
+    {
+        sendmon(dp, c, m);
+        setselmon(dp, m);
+        focus(dp, NULL);
+    }
+}
+
+void
 xi2buttonrelease(void* ev)
 {
     XIDeviceEvent* e = ev;
@@ -609,11 +637,7 @@ xi2buttonrelease(void* ev)
                 XDefineCursor(dpy, (*pc)->win, cursor[CurNormal]->cursor);
                 break;
         }
-        if ((m = recttomon(dp, (*pc)->x, (*pc)->y, (*pc)->w, (*pc)->h)) != dp->selmon) {
-            sendmon(dp, *pc, m);
-            setselmon(dp, m);
-            focus(dp, NULL);
-        }
+        postmoveselmon(dp, *pc);
         *pc = NULL;
     }
 }
@@ -1810,7 +1834,7 @@ xi2motion(void *ev)
         sw = e->child;
     }
     
-    if (sw == root && !dp->move.c && !dp->resize.c) {
+    if (sw == root && (!dp->move.c && !dp->resize.c)) {
         if (!m)
             m = recttomon(dp, e->root_x, e->root_y, 1, 1);
         if (m && m != dp->selmon) {
@@ -1818,6 +1842,7 @@ xi2motion(void *ev)
             focus(dp, NULL);
         }
     }
+
     if ((c = dp->move.c) && dp->resize.time < dp->move.time) {
         int nx, ny;
         if ((e->time - dp->move.time) <= (1000 / 60))
@@ -1836,8 +1861,11 @@ xi2motion(void *ev)
         if (!c->isfloating && dp->selmon->lt[dp->selmon->sellt]->arrange
             && (abs(nx - c->x) > snap || abs(ny - c->y) > snap))
             togglefloating(dp, NULL);
-        if (!dp->selmon->lt[dp->selmon->sellt]->arrange || c->isfloating)
-            resize(c, nx, ny, c->w, c->h, 1);
+        if (!dp->selmon->lt[dp->selmon->sellt]->arrange || c->isfloating) {
+            if(!c->isfullscreen)
+                resize(c, nx, ny, c->w, c->h, 1);
+            postmoveselmon(dp, c);
+        }
     } else if ((c = dp->resize.c) && dp->resize.time > dp->move.time) {
         int nw, nh;
         if ((e->time - dp->resize.time) <= (1000 / 60))
@@ -1852,8 +1880,11 @@ xi2motion(void *ev)
             && (abs(nw - c->w) > snap || abs(nh - c->h) > snap))
                 togglefloating(dp, NULL);
         }
-        if (!dp->selmon->lt[dp->selmon->sellt]->arrange || c->isfloating)
-            resize(c, c->x, c->y, nw, nh, 1);
+        if (!dp->selmon->lt[dp->selmon->sellt]->arrange || c->isfloating) {
+            if(!c->isfullscreen)
+                resize(c, c->x, c->y, nw, nh, 1);
+            postmoveselmon(dp, c);
+        }
     }
 
 }
@@ -1863,8 +1894,6 @@ movemouse(DevPair* dp, const Arg * __attribute__((unused)) arg)
 {
     Client* c;
     if (!(c = dp->move.c) && !(c = dp->sel))
-        return;
-    if (c->isfullscreen) /* no support moving fullscreen windows by mouse */
         return;
     restack(dp->selmon);
     XDefineCursor(dpy, c->win, cursor[CurMove]->cursor);
