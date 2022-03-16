@@ -114,6 +114,7 @@ struct Client {
     int grabbed;
     int isfixed, isfloating, isurgent, neverfocus, oldstate, isfullscreen;
     int devices;
+    int dirty_resize;
     Window win;
 };
 
@@ -796,8 +797,9 @@ configurerequest(XEvent *e)
     XWindowChanges wc;
 
     if ((c = wintoclient(ev->window))) {
-        if (ev->value_mask & CWBorderWidth)
+        if (ev->value_mask & CWBorderWidth) {
             c->bw = ev->border_width;
+        }
         else if (c->isfloating || !c->mon->lt[c->mon->sellt]->arrange) {
             m = c->mon;
             if (ev->value_mask & CWX) {
@@ -845,8 +847,9 @@ configurerequest(XEvent *e)
                 configure(c);
             if (ISVISIBLE(c))
                 XMoveResizeWindow(dpy, c->win, c->x, c->y, c->w, c->h);
-        } else
+        } else {
             configure(c);
+        }
     } else {
         wc.x = ev->x;
         wc.y = ev->y;
@@ -1070,6 +1073,9 @@ focus(DevPair* dp, Client *c)
         }
         grabbuttons(dp->mptr, c, 1);
         setfocus(dp, c);
+        if(c->isfloating || c->isfullscreen) {
+            XRaiseWindow(dpy, c->win);
+        }
     } else {
         XISetFocus(dpy, dp->mkbd->info.deviceid, root, CurrentTime);
         XISetClientPointer(dpy, root, dp->mptr->info.deviceid);
@@ -1595,6 +1601,7 @@ manage(Window w, XWindowAttributes *wa)
     DevPair* dp;
 
     c = ecalloc(1, sizeof(Client));
+    c->dirty_resize = True;
     c->grabbed = True;
     c->win = w;
     /* geometry */
@@ -1633,7 +1640,7 @@ manage(Window w, XWindowAttributes *wa)
     updatewindowtype(c);
     updatesizehints(c);
     updatewmhints(c);
-    XSelectInput(dpy, w, EnterWindowMask|PropertyChangeMask|StructureNotifyMask);
+    XSelectInput(dpy, w, EnterWindowMask|PropertyChangeMask);
 
     for (dp = devpairs; dp; dp = dp->next)
         grabbuttons(dp->mptr, c, 0);
@@ -1643,12 +1650,11 @@ manage(Window w, XWindowAttributes *wa)
         XRaiseWindow(dpy, c->win);
     attach(c);
     attachstack(c);
-    XChangeProperty(dpy, root, netatom[NetClientList], XA_WINDOW, 32, PropModeAppend,
-        (unsigned char *) &(c->win), 1);
-    XMoveResizeWindow(dpy, c->win, c->x + 2 * sw, c->y, c->w, c->h); /* some windows require this */
+    XChangeProperty(dpy, root, netatom[NetClientList], XA_WINDOW, 32, PropModeAppend, (unsigned char *) &(c->win), 1);
+    //XMoveResizeWindow(dpy, c->win, c->x + 2 * sw, c->y, c->w, c->h); /* some windows require this, should be fixed with dirty_resize */
     setclientstate(c, NormalState);
-    arrange(c->mon);
     XMapWindow(dpy, c->win);
+    arrange(c->mon);
     focus(spawndev, NULL);
 }
 
@@ -1967,8 +1973,11 @@ recttomon(DevPair* dp, int x, int y, int w, int h)
 void
 resize(Client *c, int x, int y, int w, int h, int interact)
 {
-    if (applysizehints(c, &x, &y, &w, &h, interact))
+    if (c->dirty_resize || applysizehints(c, &x, &y, &w, &h, interact))
+    {
+        c->dirty_resize = False;
         resizeclient(c, x, y, w, h);
+    }
 }
 
 void
@@ -2991,6 +3000,7 @@ xerror(Display *dpy, XErrorEvent *ee)
     || (ee->request_code == X_GrabKey && ee->error_code == BadAccess)
     || (ee->request_code == X_CopyArea && ee->error_code == BadDrawable))
         return 0;
+    
     fprintf(stderr, "mpwm: fatal error: request code=%d, error code=%d\n",
         ee->request_code, ee->error_code);
     
