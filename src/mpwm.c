@@ -1834,7 +1834,7 @@ xi2motion(void *ev)
         sw = e->child;
     }
     
-    if (sw == root && (!dp->move.c && !dp->resize.c)) {
+    if (sw == root && !dp->move.c && !dp->resize.c) {
         if (!m)
             m = recttomon(dp, e->root_x, e->root_y, 1, 1);
         if (m && m != dp->selmon) {
