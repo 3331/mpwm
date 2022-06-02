@@ -64,7 +64,7 @@ install: all
 	sudo chmod 755 "${DESTDIR}${PREFIX}/bin/${TARGET}"
 
 uninstall:
-	rm -f "${DESTDIR}${PREFIX}/bin/${TARGET}"
+	sudo rm -f "${DESTDIR}${PREFIX}/bin/${TARGET}"
 
 clean:
 	rm -rf "${ROOT_OBJDIR}" "${ROOT_DEPDIR}"

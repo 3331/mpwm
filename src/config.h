@@ -1,8 +1,8 @@
 /* See LICENSE file for copyright and license details. */
 
 /* appearance */
-static const unsigned int borderpx  = 1;        /* border pixel of windows */
-static const unsigned int gappx     = 0;       /* gap amount in pixels between clients */
+static const unsigned int borderpx  = 3;        /* border pixel of windows */
+static const unsigned int gappx     = 2;       /* gap amount in pixels between clients */
 static const int snap               = 10;       /* snap pixel */
 static const int rmaster            = 0;        /* 1 means master-area is initially on the right */
 static const int showbar            = 1;        /* 0 means no bar */
@@ -11,10 +11,10 @@ static const int lockfullscreen     = 1;        /* 1 means focus can change by a
 static const char *fonts[]          = { "monospace:size=10" };
 static const char dmenufont[]       = "monospace:size=10";
 static const char col_gray1[]       = "#222222";
-static const char col_gray2[]       = "#444444";
+static const char col_gray2[]       = "#7d4848";
 static const char col_gray3[]       = "#bbbbbb";
 static const char col_gray4[]       = "#eeeeee";
-static const char col_cyan[]        = "#005577";
+static const char col_cyan[]        = "#0259a6";
 static const char col_green[]       = "#228800";
 static const char col_red[]         = "#AA2200";
 static const char *colors[][5]      = {
