@@ -637,7 +637,7 @@ xi2buttonrelease(void* ev)
                 resizemouse(dp, &(Arg){0});
                 break;
             case CurNormal:
-                XIUndefineCursor(dpy, dp->mptr->info.deviceid, (*pc)->win);
+                XIUngrabDevice(dpy, dp->mptr->info.deviceid, CurrentTime);
                 break;
         }
         postmoveselmon(dp, *pc);
@@ -1899,19 +1899,38 @@ movemouse(DevPair* dp, const Arg * __attribute__((unused)) arg)
     Client* c;
     if (!(c = dp->move.c) && !(c = dp->sel))
         return;
+    
     restack(dp->selmon);
+    
+    if(dp->resize.c)
+    {
+        XIUngrabDevice(dpy, dp->mptr->info.deviceid, CurrentTime);
+    }
+
+    ptrevm.deviceid = dp->mptr->info.deviceid;
+    memset(ptrmask, 0, sizeof(ptrmask));
+    XISetMask(ptrmask, XI_Motion);
+    XISetMask(ptrmask, XI_ButtonPress);
+    XISetMask(ptrmask, XI_ButtonRelease);
+
+    if (XIGrabDevice(
+        dpy,
+        dp->mptr->info.deviceid,
+        root,
+        CurrentTime,
+        cursor[CurMove]->cursor,
+        GrabModeAsync,
+        GrabModeAsync,
+        False,
+        &ptrevm) != GrabSuccess)
+    {
+        return;
+    }
     
     if (!dp->move.c)
     {
         dp->move.c = dp->sel;
     }
-
-    if(dp->resize.c)
-    {
-        XIUndefineCursor(dpy, dp->mptr->info.deviceid, c->win);
-    }
-
-    XIDefineCursor(dpy, dp->mptr->info.deviceid, c->win, cursor[CurMove]->cursor);
 
     dp->move.time = dp->lastevent;
     dp->move.detail = dp->lastdetail;
@@ -1931,17 +1950,35 @@ resizemouse(DevPair* dp, const Arg * __attribute__((unused)) arg)
     
     restack(dp->selmon);
 
+    if(dp->move.c)
+    {
+        XIUngrabDevice(dpy, dp->mptr->info.deviceid, CurrentTime);
+    }
+
+    ptrevm.deviceid = dp->mptr->info.deviceid;
+    memset(ptrmask, 0, sizeof(ptrmask));
+    XISetMask(ptrmask, XI_Motion);
+    XISetMask(ptrmask, XI_ButtonPress);
+    XISetMask(ptrmask, XI_ButtonRelease);
+
+    if (XIGrabDevice(
+        dpy,
+        dp->mptr->info.deviceid,
+        root,
+        CurrentTime,
+        cursor[CurResize]->cursor,
+        GrabModeAsync,
+        GrabModeAsync,
+        False,
+        &ptrevm) != GrabSuccess)
+    {
+        return;
+    }
+    
     if (!dp->resize.c)
     {
         dp->resize.c = dp->sel;
     }
-
-    if(dp->move.c)
-    {
-        XIUndefineCursor(dpy, dp->mptr->info.deviceid, c->win);
-    }
-
-    XIDefineCursor(dpy, dp->mptr->info.deviceid, c->win, cursor[CurResize]->cursor);
 
     dp->resize.time = dp->lastevent;
     dp->resize.detail = dp->lastdetail;
