@@ -1849,7 +1849,7 @@ xi2motion(void *ev)
 
     if ((c = dp->move.c) && dp->resize.time < dp->move.time) {
         int nx, ny;
-        if ((e->time - dp->move.time) <= (1000 / 60))
+        if ((e->time - dp->move.time) <= (1000 / 250))
             return;
         dp->move.time = e->time;
         nx = dp->move.ox + ((int)e->root_x - dp->move.x);
@@ -1872,7 +1872,7 @@ xi2motion(void *ev)
         }
     } else if ((c = dp->resize.c) && dp->resize.time > dp->move.time) {
         int nw, nh;
-        if ((e->time - dp->resize.time) <= (1000 / 60))
+        if ((e->time - dp->resize.time) <= (1000 / 250))
             return;
         dp->resize.time = e->time;
         nw = MAX(e->root_x - dp->resize.ox - 2 * c->bw + 1, 1);
