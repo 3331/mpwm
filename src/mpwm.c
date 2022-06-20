@@ -157,6 +157,7 @@ struct Monitor {
 struct Motion {
     Client* c;
     Time time;
+    int active;
     int detail;
     int x;
     int y;
@@ -636,7 +637,7 @@ xi2buttonrelease(void* ev)
                 resizemouse(dp, &(Arg){0});
                 break;
             case CurNormal:
-                XDefineCursor(dpy, (*pc)->win, cursor[CurNormal]->cursor);
+                XIUndefineCursor(dpy, dp->mptr->info.deviceid, (*pc)->win);
                 break;
         }
         postmoveselmon(dp, *pc);
@@ -1899,9 +1900,19 @@ movemouse(DevPair* dp, const Arg * __attribute__((unused)) arg)
     if (!(c = dp->move.c) && !(c = dp->sel))
         return;
     restack(dp->selmon);
-    XDefineCursor(dpy, c->win, cursor[CurMove]->cursor);
+    
     if (!dp->move.c)
+    {
         dp->move.c = dp->sel;
+    }
+
+    if(dp->resize.c)
+    {
+        XIUndefineCursor(dpy, dp->mptr->info.deviceid, c->win);
+    }
+
+    XIDefineCursor(dpy, dp->mptr->info.deviceid, c->win, cursor[CurMove]->cursor);
+
     dp->move.time = dp->lastevent;
     dp->move.detail = dp->lastdetail;
     dp->move.ox = c->x;
@@ -1917,10 +1928,21 @@ resizemouse(DevPair* dp, const Arg * __attribute__((unused)) arg)
         return;
     if (c->isfullscreen) /* no support resizing fullscreen windows by mouse */
         return;
+    
     restack(dp->selmon);
-    XDefineCursor(dpy, c->win, cursor[CurResize]->cursor);
+
     if (!dp->resize.c)
+    {
         dp->resize.c = dp->sel;
+    }
+
+    if(dp->move.c)
+    {
+        XIUndefineCursor(dpy, dp->mptr->info.deviceid, c->win);
+    }
+
+    XIDefineCursor(dpy, dp->mptr->info.deviceid, c->win, cursor[CurResize]->cursor);
+
     dp->resize.time = dp->lastevent;
     dp->resize.detail = dp->lastdetail;
     dp->resize.ox = c->x;
