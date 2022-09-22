@@ -2586,9 +2586,7 @@ spawn(DevPair* dp, const Arg *arg)
         {
             setsid();
             execvp(((char **)arg->v)[0], (char **)arg->v);
-            fprintf(stderr, "mpwm: execvp %s", ((char **)arg->v)[0]);
-            perror(" failed");
-            exit(EXIT_SUCCESS);
+            die("dwm: execvp '%s' failed:", ((char **)arg->v)[0]);
         }
     }
 }
