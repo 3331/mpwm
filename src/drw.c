@@ -87,6 +87,7 @@ drw_resize(Drw *drw, unsigned int w, unsigned int h)
 
     drw->w = w;
     drw->h = h;
+    
     if (drw->drawable)
         XFreePixmap(drw->dpy, drw->drawable);
     drw->drawable = XCreatePixmap(drw->dpy, drw->root, w, h, DefaultDepth(drw->dpy, drw->screen));
@@ -241,7 +242,7 @@ drw_setscheme(Drw *drw, Clr *scm)
 void
 drw_rect(Drw *drw, int x, int y, unsigned int w, unsigned int h, int filled, int invert)
 {
-    if (!drw || !drw->scheme)
+    if (!drw || !drw->scheme || !drw->gc || !drw->drawable)
         return;
     XSetForeground(drw->dpy, drw->gc, invert ? drw->scheme[ColBg].pixel : drw->scheme[ColFg].pixel);
     if (filled)
@@ -275,7 +276,7 @@ drw_text(Drw *drw, int x, int y, unsigned int w, unsigned int h, unsigned int lp
 
     if (!render) {
         w = invert ? invert : ~invert;
-    } else {
+    } else if(drw->gc && drw->drawable) {
         XSetForeground(drw->dpy, drw->gc, drw->scheme[invert ? ColFg : ColBg].pixel);
         XFillRectangle(drw->dpy, drw->drawable, drw->gc, x, y, w, h);
         d = XftDrawCreate(drw->dpy, drw->drawable,
@@ -403,7 +404,7 @@ no_match:
 void
 drw_map(Drw *drw, Window win, int x, int y, unsigned int w, unsigned int h)
 {
-    if (!drw)
+    if (!drw || !drw->gc || !drw->drawable)
         return;
 
     XCopyArea(drw->dpy, drw->drawable, win, drw->gc, x, y, w, h, x, y);
