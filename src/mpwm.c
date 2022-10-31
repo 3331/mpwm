@@ -369,7 +369,7 @@ static Drw *drw;
 static Monitor* mons, *mons_end, *spawnmon;
 static DevPair* devpairs,* spawndev;
 static Device* floatingdevs;
-static Window root, wmcheckwin, highest_barwin = None;
+static Window root, wmcheckwin, lowest_barwin = None, highest_barwin = None, floating_stack_helper = None;
 static XIGrabModifiers anymodifier[] = { { XIAnyModifier, 0 } };
 static unsigned char hcmask[XIMaskLen(XI_HierarchyChanged)] = {0};
 static unsigned char ptrmask[XIMaskLen(XI_LASTEVENT)] = {0};
@@ -1087,6 +1087,8 @@ xi2enter(void *ev)
 void
 focus(DevPair* dp, Client *c)
 {
+    XWindowChanges wc;
+
     if ((!c || !ISVISIBLE(c)) && dp->selmon)
         for (c = dp->selmon->stack; c && !ISVISIBLE(c); c = c->snext);
     if (dp->sel && dp->sel != c)
@@ -1102,6 +1104,12 @@ focus(DevPair* dp, Client *c)
         }
         grabbuttons(dp->mptr, c, 1);
         setfocus(dp, c);
+        if(c->isfloating)
+        {
+            wc.stack_mode = Above;
+            wc.sibling = floating_stack_helper;
+            XConfigureWindow(dpy, c->win, CWSibling|CWStackMode, &wc);
+        }
     } else {
         XISetFocus(dpy, dp->mkbd->info.deviceid, root, CurrentTime);
         XISetClientPointer(dpy, root, dp->mptr->info.deviceid);
@@ -1662,7 +1670,7 @@ manage(Window w, XWindowAttributes *wa)
     updatewindowtype(c);
     updatesizehints(c);
     updatewmhints(c);
-    XSelectInput(dpy, w, EnterWindowMask|FocusChangeMask|PropertyChangeMask|StructureNotifyMask|SubstructureNotifyMask|SubstructureRedirectMask);
+    XSelectInput(dpy, w, EnterWindowMask|FocusChangeMask|PropertyChangeMask|StructureNotifyMask);
 
     for (dp = devpairs; dp; dp = dp->next)
         grabbuttons(dp->mptr, c, 0);
@@ -1670,7 +1678,7 @@ manage(Window w, XWindowAttributes *wa)
         c->isfloating = c->oldstate = trans != None || c->isfixed;
     if (c->isfloating && c->mon) {
         wc.stack_mode = Above;
-        wc.sibling = highest_barwin;
+        wc.sibling = floating_stack_helper;
         XConfigureWindow(dpy, c->win, CWSibling|CWStackMode, &wc);
     }
     attach(c);
@@ -2096,12 +2104,12 @@ restack(Monitor* m)
             /* TODO: only need to do this once per unique client */
             if (c->isfloating || !m->lt[m->sellt]->arrange) {
                 wc.stack_mode = Above;
-                wc.sibling = highest_barwin;
+                wc.sibling = floating_stack_helper;
                 XConfigureWindow(dpy, c->win, CWSibling|CWStackMode, &wc);
             }
             if (m->lt[m->sellt]->arrange) {
                 wc.stack_mode = Below;
-                wc.sibling = highest_barwin;
+                wc.sibling = lowest_barwin;
                 for (c = m->stack; c; c = c->snext)
                     if (!c->isfloating && ISVISIBLE(c)) {
                         XConfigureWindow(dpy, c->win, CWSibling|CWStackMode, &wc);
@@ -2264,7 +2272,7 @@ setfullscreen(Client *c, int fullscreen)
         c->isfloating = 1;
         resizeclient(c, c->mon->mx, c->mon->my, c->mon->mw, c->mon->mh);
         wc.stack_mode = Above;
-        wc.sibling = highest_barwin;
+        wc.sibling = floating_stack_helper;
         XConfigureWindow(dpy, c->win, CWSibling|CWStackMode, &wc);
     } else if (!fullscreen && c->isfullscreen){
         XChangeProperty(dpy, c->win, netatom[NetWMState], XA_ATOM, 32, PropModeReplace, (unsigned char*)0, 0);
@@ -2716,10 +2724,19 @@ zoom(DevPair* dp, const Arg * __attribute__((unused)) arg)
 void
 unfocus(DevPair* dp, Client* c, int setfocus)
 {
+    XWindowChanges wc;
+    
     if (!dp || !dp->sel)
         return;
-    if(c)
+    if(c) {
         grabbuttons(dp->mptr, c, 0);
+        if(c->isfloating)
+        {
+            wc.stack_mode = Below;
+            wc.sibling = floating_stack_helper;
+            XConfigureWindow(dpy, c->win, CWSibling|CWStackMode, &wc);   
+        }
+    }
     if (setfocus) {
         XISetFocus(dpy, dp->mkbd->info.deviceid, root, CurrentTime);
         XISetClientPointer(dpy, root, dp->mptr->info.deviceid);
@@ -2809,17 +2826,27 @@ updatebars(void)
                 CWOverrideRedirect|CWBackPixmap|CWEventMask, &wa);
         
         wc.stack_mode = Above;
-        if(highest_barwin == None)
-            wc.sibling = root;
+        if(highest_barwin == None) {
+            lowest_barwin = m->barwin;
+            wc.sibling = lowest_barwin;
+        }
         else
             wc.sibling = highest_barwin;
+        
         XConfigureWindow(dpy, m->barwin, CWSibling|CWStackMode, &wc);
         highest_barwin = m->barwin;
+
         XDefineCursor(dpy, m->barwin, cursor[CurNormal]->cursor);
         XMapRaised(dpy, m->barwin);
         XSetClassHint(dpy, m->barwin, &ch);
         XISelectEvents(dpy, m->barwin, &ptrevm, 1);
     }
+
+    floating_stack_helper = XCreateSimpleWindow(dpy, root, 0, 0, 1, 1, 0, 0, 0);
+
+    wc.stack_mode = Above;
+    wc.sibling = highest_barwin;
+    XConfigureWindow(dpy, floating_stack_helper, CWSibling|CWStackMode, &wc);
 }
 
 void
