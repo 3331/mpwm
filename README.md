@@ -30,6 +30,56 @@ Use the tool `xinput` to manage devices for multi pointer/keyboard adventures fo
   * **TODO** Toggle fullscreen on window (MODKEY|ShiftMask|ControlMask + f)
 * [centeredmaster](https://dwm.suckless.org/patches/centeredmaster/) (MODKEY + o)
 * [rmaster](https://dwm.suckless.org/patches/rmaster/) (MODKEY + r)
+* Forced monitor focus
+
+### Forced Monitor Focus
+
+If you have 3 monitors, you can select 1 monitor to always be the one in focus, this means that the mouse is essentially locked to be within that monitor.  
+
+Going out of bounds of the selected monitor causes an automatic swap between the two monitors, and then another swap with a pointer warp, here is an example:
+
+```text
+
+// `x` is the pointer
+
+                      Forced focus
++---------------+  +---------------+  +---------------+
+|               |  |               |  |               |
+|       1       |  |       2     x |  |       3       |
+|               |  |               |  |               |
++---------------+  +---------------+  +---------------+
+
+// Now the pointer moves from screen 2 to screen 3
+
+// First thing that happens is that screen 2 and 3 swap places
+
+                      Forced focus
++---------------+  +---------------+  +---------------+
+|               |  |               |  |               |
+|       1       |  |       3       |  | x     2       |
+|               |  |               |  |               |
++---------------+  +---------------+  +---------------+
+
+// Now screen 1 and 2 swap places
+
+                      Forced focus
++---------------+  +---------------+  +---------------+
+|               |  |               |  |               |
+|       2       |  |       3       |  | x     1       |
+|               |  |               |  |               |
++---------------+  +---------------+  +---------------+
+
+// Next the pointer is warped to the left side of the forced focus monitor
+
+                      Forced focus
++---------------+  +---------------+  +---------------+
+|               |  |               |  |               |
+|       2       |  | x     3       |  |       1       |
+|               |  |               |  |               |
++---------------+  +---------------+  +---------------+
+```
+
+This means that you can keep moving the mouse right or left forever, and the screens will just rotate around.
 
 ## Requirements
 
