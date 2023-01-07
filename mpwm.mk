@@ -8,7 +8,6 @@ PREFIX          := /usr/local
 
 # Files
 SRCS            = $(wildcard src/*.c)
-HDRS            = $(wildcard src/*.h)
 
 # Auto files
 BUILD_TYPE      := Unknown
