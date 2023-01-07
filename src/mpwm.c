@@ -59,7 +59,7 @@
 #define BUTTONMASK              (ButtonPressMask|ButtonReleaseMask)
 #define CLEANMASK(mask)         (mask & ~(numlockmask|LockMask) & (ShiftMask|ControlMask|Mod1Mask|Mod2Mask|Mod3Mask|Mod4Mask|Mod5Mask))
 #define INTERSECT(x,y,w,h,m)    (MAX(0, MIN((x)+(w),(m)->wx+(m)->ww) - MAX((x),(m)->wx)) \
-                               * MAX(0, MIN((y)+(h),(m)->wy+(m)->wh) - MAX((y),(m)->wy)))
+                               * MAX(0, MIN((y)+(h),(m)->wy+(m)->wh+((m)->showbar ? ((m)->topbar ? 0 : bh) : 0)) - MAX((y),(m)->wy-((m)->showbar ? ((m)->topbar ? bh : 0) : 0))))
 #define ISVISIBLE(C)            ((C->tags & C->mon->tagset[C->mon->seltags]))
 #define LENGTH(X)               (sizeof(X) / sizeof(X[0]))
 #define MOUSEMASK               (BUTTONMASK|PointerMotionMask)
@@ -88,9 +88,11 @@ typedef union {
     const void *v;
 } Arg;
 
-typedef struct Monitor Monitor;
-typedef struct Client Client;
-typedef struct DevPair DevPair;
+typedef struct Monitor_t Monitor;
+typedef struct Client_t Client;
+typedef struct DevPair_t DevPair;
+typedef struct Device_t Device;
+
 typedef struct {
     unsigned int click;
     unsigned int mask;
@@ -99,10 +101,11 @@ typedef struct {
     const Arg arg;
 } Button;
 
-struct Client {
+typedef struct Client_t {
     Client* next;
     Client* snext;
     Monitor* mon;
+    Clr **prev_scheme;
     DevPair* devstack;
     char name[64];
     char prefix_name[256];
@@ -117,7 +120,7 @@ struct Client {
     int devices;
     int dirty_resize;
     Window win;
-};
+} Client;
 
 typedef struct {
     unsigned int mod;
@@ -131,7 +134,7 @@ typedef struct {
     void (*arrange)(Monitor*);
 } Layout;
 
-struct Monitor {
+typedef struct Monitor_t {
     Monitor* next;
     Monitor* prev;
     Client* clients;
@@ -153,9 +156,9 @@ struct Monitor {
     int devices;
     Window barwin;
     const Layout *lt[2];
-};
+} Monitor;
 
-struct Motion {
+typedef struct {
     Client* c;
     Time time;
     int active;
@@ -164,19 +167,17 @@ struct Motion {
     int y;
     int ox;
     int oy;
-};
+} Motion;
 
-typedef struct Device Device;
-struct Device {
+typedef struct Device_t {
     DevPair* self;
     XIHierarchyInfo info;
     Device* snext; /* next slave */
     Device* sprev; /* prev slave (not implemented) */
-};
+} Device;
 
-typedef struct Motion Motion;
-struct DevPair {
-    DevPair* next; /* next devpair */
+typedef struct DevPair_t {
+    DevPair* next;  /* next devpair */
     DevPair* fnext; /* next devpair that has same focus */
     DevPair* mnext; /* next devpair that has same monitor */
     Monitor* selmon;
@@ -190,7 +191,7 @@ struct DevPair {
     Motion move;
     Time lastevent;
     int lastdetail;
-};
+} DevPair;
 
 typedef struct {
     const char *class;
@@ -218,6 +219,7 @@ static void tag(DevPair* dp, const Arg *arg);
 static void tagmon(DevPair* dp, const Arg *arg);
 static void togglebar(DevPair* dp, const Arg *arg);
 static void togglefloating(DevPair* dp, const Arg *arg);
+static void toggleautoswapmon(DevPair* dp, const Arg *arg);
 static void togglermaster(DevPair* dp, const Arg *arg);
 static void togglemouse(DevPair* dp, const Arg *arg);
 static void toggletag(DevPair* dp, const Arg *arg);
@@ -359,14 +361,15 @@ static void (*xi2handler[XI_LASTEVENT]) (void *) = {
     [XI_FocusIn] = xi2focusin,
     [XI_HierarchyChanged] = xi2hierarchychanged
 };
+
 static int xi2opcode;
 static Atom wmatom[WMLast], netatom[NetLast];
 static int running = 1;
 static Cur *cursor[CurLast];
-static Clr **scheme;
+static Clr **scheme, **ff_scheme;
 static Display *dpy;
 static Drw *drw;
-static Monitor* mons, *mons_end, *spawnmon;
+static Monitor* mons, *mons_end, *spawnmon, *forcedfocusmon;
 static DevPair* devpairs,* spawndev;
 static Device* floatingdevs;
 static Window root, wmcheckwin, lowest_barwin = None, highest_barwin = None, floating_stack_helper = None;
@@ -378,6 +381,8 @@ static XIEventMask hcevm = { .deviceid = XIAllDevices, .mask_len = sizeof(hcmask
 static XIEventMask ptrevm = { .deviceid = -1, .mask_len = sizeof(ptrmask), .mask = ptrmask };
 static XIEventMask kbdevm = { .deviceid = -1, .mask_len = sizeof(kbdmask), .mask = kbdmask };
 static Device deviceslots[MAXDEVICES] = {0};
+
+static int forcing_focus = 0;
 int log_fd = 2;
 
 /* configuration, allows nested code to access above variables */
@@ -557,7 +562,6 @@ xi2buttonpress(void* ev)
         setselmon(dp, m);
         focus(dp, NULL);
     }
-    
     if (e->event == dp->selmon->barwin) {
         i = x = 0;
         do
@@ -685,6 +689,9 @@ cleanup(void)
         drw_cur_free(drw, cursor[i]);
     for (i = 0; i < LENGTH(colors); i++)
         free(scheme[i]);
+    for (i = 0; i < LENGTH(ff_colors); i++)
+        free(ff_scheme[i]);
+    free(ff_scheme);
     free(scheme);
     XDestroyWindow(dpy, wmcheckwin);
     drw_free(drw);
@@ -959,19 +966,60 @@ detachstack(Client* c)
 Monitor *
 dirtomon(DevPair* dp, int dir)
 {
+    int best_neg = 0;
+    int best_pos = 0;
+    int middle = dp->selmon->mx + (dp->selmon->mw / 2);
+    int delta;
     Monitor* m = NULL;
+    Monitor* m_left = NULL;
+    Monitor* m_right = NULL;
 
+    // Left
     if (dir > 0)
     {
-        if (!(m = dp->selmon->next))
-            m = mons;
+        // looking for the closest positive number
+        for(m = mons; m; m = m->next)
+        {
+            if(m == dp->selmon)
+                continue;
+            delta = middle - (m->mx + (m->mw / 2));
+            // look for closest left screen (closest to 0 positive number)
+            if((!best_pos && delta > 0) || (best_pos && delta > 0 && best_pos > delta))
+            {
+                best_pos = delta;
+                m_left = m;
+            }
+            // look for furthest right screen (furthest away from 0 negative number)
+            if((!best_neg && delta < 0) || (best_neg && delta < 0 && best_neg > delta))
+            {
+                best_neg = delta;
+                m_right = m;
+            }
+        }
+        return m_left ? m_left : m_right;
     }
-    else
+
+    // Right
+    // looking for the closest positive number
+    for(m = mons; m; m = m->next)
     {
-        if (!(m = dp->selmon->prev))
-            m = mons_end;
+        if(m == dp->selmon)
+            continue;
+        delta = middle - (m->mx + (m->mw / 2));
+        // look for the left screen (closest to 0 negative number)
+        if((!best_neg && delta < 0) || (best_neg && delta < 0 && best_neg < delta))
+        {
+            best_neg = delta;
+            m_right = m;
+        }
+        // look for the right screen (furthest away from 0 positive number)
+        if((!best_pos && delta > 0) || (best_pos && delta > 0 && best_pos < delta))
+        {
+            best_pos = delta;
+            m_left = m;
+        }
     }
-    return m;
+    return m_right ? m_right : m_left;
 }
 
 void
@@ -987,13 +1035,19 @@ drawbar(Monitor* m)
     DevPair* dp;
     DevPair* mdp;
     DevPair* cdp;
+    Clr ** cur_scheme;
+
+    if(m == forcedfocusmon)
+        cur_scheme = ff_scheme;
+    else
+        cur_scheme = scheme;
 
     if (!m->showbar)
         return;
     
     /* draw status first so it can be overdrawn by tags later */
     if (m->devices) {
-        drw_setscheme(drw, scheme[SchemeNorm]);
+        drw_setscheme(drw, cur_scheme[SchemeNorm]);
         sw = TEXTW(stext) - lrpad + 2; /* 2px right padding */
         drw_text(drw, m->ww - sw, 0, sw, bh, 0, stext, 0);
     }
@@ -1006,7 +1060,7 @@ drawbar(Monitor* m)
     x = 0;
     for (i = 0; i < LENGTH(tags); i++) {
         w = TEXTW(tags[i]);
-        drw_setscheme(drw, scheme[m->tagset[m->seltags] & 1 << i ? CLAMP(SchemeNorm + m->devices, SchemeNorm, SchemeSel3) : SchemeNorm]);
+        drw_setscheme(drw, cur_scheme[m->tagset[m->seltags] & 1 << i ? CLAMP(SchemeNorm + m->devices, SchemeNorm, SchemeSel3) : SchemeNorm]);
         drw_text(drw, x, 0, w, bh, lrpad / 2, tags[i], urg & 1 << i);
         if (occ & 1 << i) {
             for (dp = m->devstack; dp && !selt; dp = dp->mnext) {
@@ -1019,7 +1073,7 @@ drawbar(Monitor* m)
         x += w;
     }
     w = TEXTW(m->ltsymbol);
-    drw_setscheme(drw, scheme[SchemeNorm]);
+    drw_setscheme(drw, cur_scheme[SchemeNorm]);
     x = drw_text(drw, x, 0, w, bh, lrpad / 2, m->ltsymbol, 0);
 
     /*
@@ -1042,11 +1096,11 @@ drawbar(Monitor* m)
             i++;
         }
         if (m->devstack) {
-            drw_setscheme(drw, scheme[CLAMP(SchemeNorm + m->devices, SchemeNorm, SchemeSel3)]);
+            drw_setscheme(drw, cur_scheme[CLAMP(SchemeNorm + m->devices, SchemeNorm, SchemeSel3)]);
             drw_text(drw, x, 0, w, bh, lrpad / 2, focus_text, 0);
         }
         else {
-            drw_setscheme(drw, scheme[SchemeNorm]);
+            drw_setscheme(drw, cur_scheme[SchemeNorm]);
             drw_rect(drw, x, 0, w, bh, 1, 1);
             drw_text(drw, x, 0, w, bh, lrpad / 2, "", 0);
         }
@@ -1156,42 +1210,13 @@ swapmon(DevPair* dp, const Arg *arg)
     
     Monitor* cur = dp->selmon;
 
-    if (arg->i > 0)
-    {
-        if(cur->next)
-        {
-            unlinkmon(cur);
-            insertmon(tar, cur);
-        }
-        else
-        {
-            unlinkmon(cur);
-            unlinkmon(tar);
-            insertmon(NULL, cur);
-            insertmon(mons_end, tar);
-        }
-    }
-    else
-    {
-        if(tar->next)
-        {
-            unlinkmon(tar);
-            insertmon(cur, tar);
-        }
-        else
-        {
-            unlinkmon(tar);
-            unlinkmon(cur);
-            insertmon(NULL, tar);
-            insertmon(mons_end, cur);
-        }
-    }
-
     unfocus(dp, dp->sel, 0);
 
+    swap_uint32(&cur->nmaster, &tar->nmaster);
     swap_ulong(&cur->barwin, &tar->barwin);
+    swap_float(&cur->mfact, &tar->mfact);
+    swap_int(&cur->rmaster, &tar->rmaster);
     swap_int(&cur->num, &tar->num);
-    swap_int(&cur->by, &tar->by);
     swap_int(&cur->mx, &tar->mx);
     swap_int(&cur->my, &tar->my);
     swap_int(&cur->mw, &tar->mw);
@@ -1200,7 +1225,15 @@ swapmon(DevPair* dp, const Arg *arg)
     swap_int(&cur->wy, &tar->wy);
     swap_int(&cur->ww, &tar->ww);
     swap_int(&cur->wh, &tar->wh);
+
+    updatebarpos(cur);
+    updatebarpos(tar);
+
+    XMoveResizeWindow(dpy, cur->barwin, cur->wx, cur->by, cur->ww, bh);
+    XMoveResizeWindow(dpy, tar->barwin, tar->wx, tar->by, tar->ww, bh);
     
+    if(forcedfocusmon)
+        forcedfocusmon = tar;
     setselmon(dp, tar);
     focus(dp, NULL);
     arrange(tar);
@@ -1631,7 +1664,13 @@ manage(Window w, XWindowAttributes *wa)
     Window trans = None;
     XWindowChanges wc;
     DevPair* dp;
+    Clr** cur_scheme;
 
+    if(forcedfocusmon)
+        cur_scheme = ff_scheme;
+    else
+        cur_scheme = scheme;
+    
     c = ecalloc(1, sizeof(Client));
     c->dirty_resize = True;
     c->grabbed = True;
@@ -1665,7 +1704,7 @@ manage(Window w, XWindowAttributes *wa)
 
     wc.border_width = c->bw;
     XConfigureWindow(dpy, w, CWBorderWidth, &wc);
-    XSetWindowBorder(dpy, w, scheme[SchemeNorm][ColBorder].pixel);
+    XSetWindowBorder(dpy, w, cur_scheme[SchemeNorm][ColBorder].pixel);
     configure(c); /* propagates border_width, if size doesn't change */
     updatewindowtype(c);
     updatesizehints(c);
@@ -1828,6 +1867,9 @@ xi2motion(void *ev)
     Window sw;
     DevPair* dp = getdevpair(e->deviceid);
 
+    if(forcing_focus)
+        return;
+        
     if (!e->child) {
         sw = e->event;
         for(m = mons; m; m = m->next) {
@@ -2351,13 +2393,19 @@ setsel(DevPair* dp, Client* c, int dirty)
 {
     DevPair **tdp;
     DevPair* ndp;
+    Clr** cur_scheme;
 
     if (dp->sel == c)
         return;
+
+    if(forcedfocusmon)
+        cur_scheme = ff_scheme;
+    else
+        cur_scheme = scheme;
     
     if (dp->sel) {
         dp->sel->devices--;
-        XSetWindowBorder(dpy, dp->sel->win, scheme[CLAMP(SchemeNorm + dp->sel->devices, SchemeNorm, SchemeSel3)][ColBorder].pixel);
+        XSetWindowBorder(dpy, dp->sel->win, cur_scheme[CLAMP(SchemeNorm + dp->sel->devices, SchemeNorm, SchemeSel3)][ColBorder].pixel);
         for (tdp = &dp->sel->devstack; *tdp && *tdp != dp; tdp = &(*tdp)->fnext);
         *tdp = dp->fnext;
         dp->fnext = NULL;
@@ -2368,7 +2416,7 @@ setsel(DevPair* dp, Client* c, int dirty)
 
     if (dp->sel) {
         dp->sel->devices++;
-        XSetWindowBorder(dpy, dp->sel->win, scheme[CLAMP(SchemeNorm + dp->sel->devices, SchemeNorm, SchemeSel3)][ColBorder].pixel);
+        XSetWindowBorder(dpy, dp->sel->win, cur_scheme[CLAMP(SchemeNorm + dp->sel->devices, SchemeNorm, SchemeSel3)][ColBorder].pixel);
         for (ndp = dp->sel->devstack; ndp && ndp->fnext; ndp = ndp->fnext);
         if (ndp)
             ndp->fnext = dp;
@@ -2384,9 +2432,100 @@ setselmon(DevPair* dp, Monitor* m)
 {
     DevPair **tdp;
     DevPair* ndp;
+    int cur_bar_offset;
+    int tar_bar_offset;
+    int gotrootptr;
 
     if(dp->selmon == m)
         return;
+
+    if(forcedfocusmon && m != forcedfocusmon)
+    {
+        forcing_focus = 1;
+        Monitor* mouse_mon = NULL;
+        Monitor* tar = m;
+        Monitor* tar2 = NULL;
+        int x, y;
+
+        // only 1 screen, no need...
+        if (!mons->next)
+            return;
+
+        Monitor* cur = dp->selmon;
+        int dir = (cur->mx + (cur->mw / 2)) - (tar->mx + (tar->mw / 2));
+        tar2 = dirtomon(dp, -dir);
+        
+        if(getrootptr(dp, &x, &y) && recttomon(dp, x, y, 1, 1) != cur)
+        {
+            if(cur->showbar)
+                if(cur->topbar)
+                    cur_bar_offset = -bh;
+                else
+                    cur_bar_offset = bh;
+            else
+                cur_bar_offset = 0;
+            
+            if(tar->showbar)
+                if(tar->topbar)
+                    tar_bar_offset = -bh;
+                else
+                    tar_bar_offset = bh;
+            else
+                tar_bar_offset = 0;
+
+            XIWarpPointer(dpy, dp->mptr->info.deviceid, None, None, 0, 0, 0, 0, cur->wx - tar->wx, (cur->wy + cur_bar_offset) - (tar->wy + tar_bar_offset));
+        }
+
+        forcedfocusmon = tar;
+
+        XSync(dpy, False);
+        
+        swap_uint32(&cur->nmaster, &tar->nmaster);
+        swap_ulong(&cur->barwin, &tar->barwin);
+        swap_float(&cur->mfact, &tar->mfact);
+        swap_int(&cur->rmaster, &tar->rmaster);
+        swap_int(&cur->num, &tar->num);
+        swap_int(&cur->mx, &tar->mx);
+        swap_int(&cur->my, &tar->my);
+        swap_int(&cur->mw, &tar->mw);
+        swap_int(&cur->mh, &tar->mh);
+        swap_int(&cur->wx, &tar->wx);
+        swap_int(&cur->wy, &tar->wy);
+        swap_int(&cur->ww, &tar->ww);
+        swap_int(&cur->wh, &tar->wh);
+        
+        if(tar2)
+        {
+            swap_uint32(&cur->nmaster, &tar->nmaster);
+            swap_ulong(&cur->barwin, &tar2->barwin);
+            swap_float(&cur->mfact, &tar->mfact);
+            swap_int(&cur->rmaster, &tar->rmaster);
+            swap_int(&cur->num, &tar2->num);
+            swap_int(&cur->mx, &tar2->mx);
+            swap_int(&cur->my, &tar2->my);
+            swap_int(&cur->mw, &tar2->mw);
+            swap_int(&cur->mh, &tar2->mh);
+            swap_int(&cur->wx, &tar2->wx);
+            swap_int(&cur->wy, &tar2->wy);
+            swap_int(&cur->ww, &tar2->ww);
+            swap_int(&cur->wh, &tar2->wh);
+            updatebarpos(tar2);
+            XMoveResizeWindow(dpy, tar2->barwin, tar2->wx, tar2->by, tar2->ww, bh);
+            arrange(tar2);
+        }
+        
+        updatebarpos(tar);
+        updatebarpos(cur);
+
+        XMoveResizeWindow(dpy, cur->barwin, cur->wx, cur->by, cur->ww, bh);
+        XMoveResizeWindow(dpy, tar->barwin, tar->wx, tar->by, tar->ww, bh);
+
+        arrange(tar);
+        arrange(cur);
+        
+        XSync(dpy, False);
+        forcing_focus = 0;
+    }
 
     if (dp->selmon) {
         dp->selmon->devices--;
@@ -2627,6 +2766,7 @@ togglebar(DevPair* dp, const Arg * __attribute__((unused)) arg)
     updatebarpos(dp->selmon);
     XMoveResizeWindow(dpy, dp->selmon->barwin, dp->selmon->wx, dp->selmon->by, dp->selmon->ww, bh);
     arrange(dp->selmon);
+    drawbar(dp->selmon);
 }
 
 void
@@ -2641,6 +2781,56 @@ togglefloating(DevPair* dp, const Arg * __attribute__((unused)) arg)
         resize(dp->sel, dp->sel->x, dp->sel->y,
             dp->sel->w, dp->sel->h, 0);
     arrange(dp->selmon);
+}
+
+void
+toggleautoswapmon(DevPair* dp, const Arg * __attribute__((unused)) arg)
+{
+    Clr** cur_scheme;
+    Monitor* fake_tar;
+    int x, y;
+    int cur_bar_offset, tar_bar_offset;
+
+    if(!dp->selmon)
+        return;
+    
+    if(forcedfocusmon)
+    {
+        cur_scheme = scheme;
+        forcedfocusmon = NULL;
+    }
+    else
+    {
+        cur_scheme = ff_scheme;
+        forcedfocusmon = dp->selmon;
+    }
+
+    if(dp->sel)
+        XSetWindowBorder(dpy, dp->sel->win, cur_scheme[CLAMP(SchemeNorm + dp->sel->devices, SchemeNorm, SchemeSel3)][ColBorder].pixel);
+    
+    if(getrootptr(dp, &x, &y) && (fake_tar = recttomon(dp, x, y, 1, 1)) != dp->selmon)
+    {
+        if(dp->selmon->showbar)
+            if(dp->selmon->topbar)
+                cur_bar_offset = -bh;
+            else
+                cur_bar_offset = bh;
+        else
+            cur_bar_offset = 0;
+        
+        if(fake_tar->showbar)
+            if(fake_tar->topbar)
+                tar_bar_offset = -bh;
+            else
+                tar_bar_offset = bh;
+        else
+            tar_bar_offset = 0;
+
+        XIWarpPointer(dpy, dp->mptr->info.deviceid, None, None, 0, 0, 0, 0, dp->selmon->wx - fake_tar->wx, (dp->selmon->wy + cur_bar_offset) - (fake_tar->wy + tar_bar_offset));
+    }
+    
+    setselmon(dp, dp->selmon);
+    drawbars();
 }
 
 void
@@ -3183,6 +3373,7 @@ setup(void)
     mons = NULL;
     mons_end = NULL;
     spawnmon = NULL;
+    forcedfocusmon = NULL;
     screen = DefaultScreen(dpy);
     sw = DisplayWidth(dpy, screen);
     sh = DisplayHeight(dpy, screen);
@@ -3234,6 +3425,9 @@ setup(void)
     scheme = ecalloc(LENGTH(colors), sizeof(Clr *));
     for (i = 0; i < LENGTH(colors); i++)
         scheme[i] = drw_scm_create(drw, colors[i], LENGTH(*colors));
+    ff_scheme = ecalloc(LENGTH(colors), sizeof(Clr *));
+    for (i = 0; i < LENGTH(ff_colors); i++)
+        ff_scheme[i] = drw_scm_create(drw, ff_colors[i], LENGTH(*ff_colors));
     /* init bars */
     updatebars();
     updatestatus();
