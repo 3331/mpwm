@@ -30,7 +30,7 @@ Use the tool `xinput` to manage devices for multi pointer/keyboard adventures fo
   * **TODO** Toggle fullscreen on window (MODKEY|ShiftMask|ControlMask + f)
 * [centeredmaster](https://dwm.suckless.org/patches/centeredmaster/) (MODKEY + o)
 * [rmaster](https://dwm.suckless.org/patches/rmaster/) (MODKEY + r)
-* Forced monitor focus
+* Forced focus monitor
 
 ### Forced Monitor Focus
 
@@ -40,7 +40,7 @@ Going out of bounds of the selected monitor causes an automatic swap between the
 
 ```text
 
-// `x` is the pointer
+`x` is the pointer
 
                       Forced focus
 +---------------+  +---------------+  +---------------+
@@ -49,9 +49,9 @@ Going out of bounds of the selected monitor causes an automatic swap between the
 |               |  |               |  |               |
 +---------------+  +---------------+  +---------------+
 
-// Now the pointer moves from screen 2 to screen 3
+Now the pointer moves from screen 2 to screen 3
 
-// First thing that happens is that screen 2 and 3 swap places
+First thing that happens is that screen 2 and 3 swap places
 
                       Forced focus
 +---------------+  +---------------+  +---------------+
@@ -60,7 +60,7 @@ Going out of bounds of the selected monitor causes an automatic swap between the
 |               |  |               |  |               |
 +---------------+  +---------------+  +---------------+
 
-// Now screen 1 and 2 swap places
+Now screen 1 and 2 swap places
 
                       Forced focus
 +---------------+  +---------------+  +---------------+
@@ -69,7 +69,7 @@ Going out of bounds of the selected monitor causes an automatic swap between the
 |               |  |               |  |               |
 +---------------+  +---------------+  +---------------+
 
-// Next the pointer is warped to the left side of the forced focus monitor
+Next the pointer is warped to the left side of the forced focus monitor
 
                       Forced focus
 +---------------+  +---------------+  +---------------+
