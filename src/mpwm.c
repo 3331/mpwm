@@ -301,7 +301,6 @@ static void run(void);
 static void scan(void);
 static void setup(void);
 static void cleanup(void);
-static void sigchld(int unused);
 static void updatebars(void);
 static void updateclientlist(void);
 static void updatenumlockmask(void);
@@ -956,9 +955,16 @@ detachstack(Client* c)
     for (tc = &c->mon->stack; *tc && *tc != c; tc = &(*tc)->snext);
     *tc = c->snext;
 
+    for (t = c->mon->stack; t && !ISVISIBLE(t); t = t->snext);
+    
     for (dp = c->devstack; dp; dp = dp->next) {
-        if (!t)
-            for (t = c->mon->stack; t && !ISVISIBLE(t); t = t->snext);
+        if(dp->resize.c || dp->move.c)
+        {
+            dp->resize.c = NULL;
+            dp->move.c = NULL;
+            XIUngrabDevice(dpy, dp->mptr->info.deviceid, CurrentTime);
+        }
+
         setsel(dp, t, True);
     }
 }
@@ -2708,6 +2714,7 @@ spawn(DevPair* dp, const Arg *arg)
     pid_t pid1;
     pid_t pid2;
     int status;
+    struct sigaction sa;
 
     if(!dp->selmon)
         return;
@@ -2724,6 +2731,7 @@ spawn(DevPair* dp, const Arg *arg)
     {
         if (dpy)
             close(ConnectionNumber(dpy));
+
         if (fork())
         {
             exit(0);
@@ -2731,6 +2739,11 @@ spawn(DevPair* dp, const Arg *arg)
         else
         {
             setsid();
+            sigemptyset(&sa.sa_mask);
+            sa.sa_flags = 0;
+            sa.sa_handler = SIG_DFL;
+            sigaction(SIGCHLD, &sa, NULL);
+
             execvp(((char **)arg->v)[0], (char **)arg->v);
             die("dwm: execvp '%s' failed:", ((char **)arg->v)[0]);
         }
@@ -2770,13 +2783,22 @@ togglebar(DevPair* dp, const Arg * __attribute__((unused)) arg)
 }
 
 void
-togglefloating(DevPair* dp, const Arg * __attribute__((unused)) arg)
+togglefloating(DevPair* dp, const Arg * arg)
 {
     if (!dp->selmon || !dp->sel)
         return;
     if (dp->sel->isfullscreen) /* no support for fullscreen windows */
         return;
     dp->sel->isfloating = !dp->sel->isfloating || dp->sel->isfixed;
+    
+    // invoked from key combination
+    if(arg && (dp->move.c || dp->resize.c))
+    {
+        dp->move.c = NULL;
+        dp->resize.c = NULL;
+        XIUngrabDevice(dpy, dp->mptr->info.deviceid, CurrentTime);
+    }
+    
     if (dp->sel->isfloating)
         resize(dp->sel, dp->sel->x, dp->sel->y,
             dp->sel->w, dp->sel->h, 0);
@@ -2955,10 +2977,10 @@ unmanage(Client *c, int destroyed)
         XSetErrorHandler(xerror);
         XUngrabServer(dpy);
     }
-    free(c); /* TODO: potential UAF when resizing/moving windows if client closes randomly */
+    free(c);
     for (dp = devpairs; dp; dp = dp->next)
         if (dp->dirty_sel)
-            focus(dp, NULL);
+            focus(dp, dp->sel);
     updateclientlist();
     arrange(m);
 }
@@ -3345,19 +3367,12 @@ xerrorstart(Display * __attribute__((unused)) dpy, XErrorEvent * __attribute__((
 }
 
 void
-sigchld(int __attribute__((unused)) unused)
-{
-    if (signal(SIGCHLD, sigchld) == SIG_ERR)
-        die("can't install SIGCHLD handler:");
-    while (0 < waitpid(-1, NULL, WNOHANG));
-}
-
-void
 setup(void)
 {
     uint32_t i;
     XSetWindowAttributes wa;
     Atom utf8string;
+    struct sigaction sa;
 
 #ifdef DEBUG
     unlink("/home/user/.mpwm.log");
@@ -3366,9 +3381,15 @@ setup(void)
         die("could not open log_fd, why not..\n");
 #endif
 
-    /* clean up any zombies immediately */
-    sigchld(0);
-    
+    /* do not transform children into zombies when they terminate */
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_NOCLDSTOP | SA_NOCLDWAIT | SA_RESTART;
+    sa.sa_handler = SIG_IGN;
+    sigaction(SIGCHLD, &sa, NULL);
+
+    /* clean up any zombies (inherited from .xinitrc etc) immediately */
+    while (waitpid(-1, NULL, WNOHANG) > 0);
+
     /* init screen */
     mons = NULL;
     mons_end = NULL;
