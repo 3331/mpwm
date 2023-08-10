@@ -512,6 +512,7 @@ arrange(Monitor* m)
 void
 arrangemon(Monitor *m)
 {
+    
     strncpy(m->ltsymbol, m->lt[m->sellt]->symbol, sizeof(m->ltsymbol));
     if (m->lt[m->sellt]->arrange)
         m->lt[m->sellt]->arrange(m);
@@ -695,8 +696,8 @@ cleanup(void)
     XDestroyWindow(dpy, wmcheckwin);
     drw_free(drw);
     XSync(dpy, False);
-    XISetFocus(dpy, XIAllMasterDevices, root, CurrentTime);
-    XISetClientPointer(dpy, root, XIAllMasterDevices);
+    XISetFocus(dpy, XIAllMasterDevices, None, CurrentTime);
+    XISetClientPointer(dpy, None, XIAllMasterDevices);
     XDeleteProperty(dpy, root, netatom[NetActiveWindow]);
 }
 
@@ -1172,7 +1173,7 @@ focus(DevPair* dp, Client *c)
         }
     } else {
         XISetFocus(dpy, dp->mkbd->info.deviceid, root, CurrentTime);
-        XISetClientPointer(dpy, root, dp->mptr->info.deviceid);
+        XISetClientPointer(dpy, None, dp->mptr->info.deviceid);
         XDeleteProperty(dpy, root, netatom[NetActiveWindow]);
     }
     setsel(dp, c, False);
@@ -1379,12 +1380,13 @@ gettextprop(Window w, Atom atom, char *text, unsigned int size)
 void
 grabbuttons(Device* mptr, Client *c, int focused)
 {
-    ptrevm.deviceid = mptr->info.deviceid;
+    ptrevm.deviceid = XIAllDevices;
     memset(ptrmask, 0, sizeof(ptrmask));
     XISetMask(ptrmask, XI_Enter);
     XISetMask(ptrmask, XI_FocusIn);
     XISelectEvents(dpy, c->win, &ptrevm, 1);
 
+    ptrevm.deviceid = mptr->info.deviceid;
     memset(ptrmask, 0, sizeof(ptrmask));
     XISetMask(ptrmask, XI_Motion);
     XISetMask(ptrmask, XI_ButtonPress);
@@ -1397,8 +1399,8 @@ grabbuttons(Device* mptr, Client *c, int focused)
         if(!c->grabbed)
             return;
         if (!focused)
-            XIGrabButton(dpy, ptrevm.deviceid, XIAnyButton, c->win, None, GrabModeAsync,
-                GrabModeAsync, False, &ptrevm, LENGTH(anymodifier), anymodifier);
+            XIGrabButton(dpy, ptrevm.deviceid, XIAnyButton, c->win, None, XIGrabModeAsync,
+                XIGrabModeAsync, False, &ptrevm, LENGTH(anymodifier), anymodifier);
         for (i = 0; i < LENGTH(buttons); i++) {
             if (buttons[i].click != ClkClientWin)
                 continue;
@@ -1408,8 +1410,8 @@ grabbuttons(Device* mptr, Client *c, int focused)
                 { buttons[i].mask|numlockmask, 0 },
                 { buttons[i].mask|numlockmask|LockMask, 0 }
             };
-            XIGrabButton(dpy, ptrevm.deviceid, buttons[i].button, c->win, None, GrabModeAsync,
-                GrabModeAsync, False, &ptrevm, LENGTH(modifiers), modifiers);
+            XIGrabButton(dpy, ptrevm.deviceid, buttons[i].button, c->win, None, XIGrabModeAsync,
+                XIGrabModeAsync, False, &ptrevm, LENGTH(modifiers), modifiers);
         }
     }
 }
@@ -1447,7 +1449,6 @@ grabdevicebuttons(Device* mptr)
 {
     ptrevm.deviceid = mptr->info.deviceid;
     memset(ptrmask, 0, sizeof(ptrmask));
-    XISetMask(ptrmask, XI_FocusIn);
     XISelectEvents(dpy, root, &ptrevm, 1);
 }
 
@@ -1715,7 +1716,7 @@ manage(Window w, XWindowAttributes *wa)
     updatewindowtype(c);
     updatesizehints(c);
     updatewmhints(c);
-    XSelectInput(dpy, w, EnterWindowMask|FocusChangeMask|PropertyChangeMask|StructureNotifyMask);
+    XSelectInput(dpy, w, PropertyChangeMask|StructureNotifyMask);
 
     for (dp = devpairs; dp; dp = dp->next)
         grabbuttons(dp->mptr, c, 0);
@@ -1969,8 +1970,8 @@ movemouse(DevPair* dp, const Arg * __attribute__((unused)) arg)
         root,
         CurrentTime,
         cursor[CurMove]->cursor,
-        GrabModeAsync,
-        GrabModeAsync,
+        XIGrabModeAsync,
+        XIGrabModeAsync,
         False,
         &ptrevm) != GrabSuccess)
     {
@@ -2017,8 +2018,8 @@ resizemouse(DevPair* dp, const Arg * __attribute__((unused)) arg)
         root,
         CurrentTime,
         cursor[CurResize]->cursor,
-        GrabModeAsync,
-        GrabModeAsync,
+        XIGrabModeAsync,
+        XIGrabModeAsync,
         False,
         &ptrevm) != GrabSuccess)
     {
@@ -2166,6 +2167,7 @@ restack(Monitor* m)
             }
         }
     }
+
     XSync(dpy, False);
     xi2handler[XI_Enter] = NULL;
     while (XCheckTypedEvent(dpy, GenericEvent, &ev)) {
@@ -2951,7 +2953,7 @@ unfocus(DevPair* dp, Client* c, int setfocus)
     }
     if (setfocus) {
         XISetFocus(dpy, dp->mkbd->info.deviceid, root, CurrentTime);
-        XISetClientPointer(dpy, root, dp->mptr->info.deviceid);
+        XISetClientPointer(dpy, None, dp->mptr->info.deviceid);
         XDeleteProperty(dpy, root, netatom[NetActiveWindow]);
     }
     setsel(dp, NULL, False);
@@ -3332,7 +3334,7 @@ int
 xerror(Display *dpy, XErrorEvent *ee)
 {
     // 12, 3, 8
-    DBG("xerror: request code=%d, error code=%d\n", ee->request_code, ee->error_code);
+    DBG("xerror: request code=%d, error code=%d, minor code=%d\n", ee->request_code, ee->error_code, ee->minor_code);
     if (ee->error_code == BadWindow
     || (ee->request_code == xi2opcode && ee->error_code == BadMatch)
     || (ee->request_code == X_SetInputFocus && ee->error_code == BadMatch)
