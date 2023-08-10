@@ -9,6 +9,9 @@
 #include "util.h"
 
 extern int log_fd;
+#ifdef DEBUG
+int indent;
+#endif
 
 void *
 ecalloc(size_t nmemb, size_t size)

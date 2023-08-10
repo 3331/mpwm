@@ -6,8 +6,13 @@
 #define BETWEEN(X, A, B)        ((A) <= (X) && (X) <= (B))
 
 #ifdef DEBUG
-#define DBG(...) dprintf(log_fd, __VA_ARGS__)
+extern int indent;
+#define DBG_IN(...) dprintf(log_fd, "%*s", indent*4, "");dprintf(log_fd, __VA_ARGS__);indent++;
+#define DBG_OUT(...) indent--;dprintf(log_fd, "%*s", indent*4, "");dprintf(log_fd, __VA_ARGS__);
+#define DBG(...) dprintf(log_fd, "%*s", indent*4, "");dprintf(log_fd, __VA_ARGS__);
 #else
+#define DBG_IN(...) while(0) {}
+#define DBG_OUT(...) while(0) {}
 #define DBG(...) while(0) {}
 #endif
 
