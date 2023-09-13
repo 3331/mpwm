@@ -3230,7 +3230,7 @@ updatesizehints(Client *c)
 }
 
 void
-updatestatus()
+updatestatus(void)
 {
     Monitor* m;
     if (!gettextprop(root, XA_WM_NAME, stext, sizeof(stext)))
