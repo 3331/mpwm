@@ -219,6 +219,7 @@ static void tag(DevPair* dp, const Arg *arg);
 static void tagmon(DevPair* dp, const Arg *arg);
 static void togglebar(DevPair* dp, const Arg *arg);
 static void togglefloating(DevPair* dp, const Arg *arg);
+static void togglefullscreen(DevPair* dp, const Arg *arg);
 static void toggleautoswapmon(DevPair* dp, const Arg *arg);
 static void togglermaster(DevPair* dp, const Arg *arg);
 static void togglemouse(DevPair* dp, const Arg *arg);
@@ -598,6 +599,9 @@ postmoveselmon(DevPair* dp, Client* c)
     Monitor* m;
     int x, y;
 
+    if(!c)
+        return;
+
     if(!c->isfloating)
         return;
     
@@ -956,9 +960,10 @@ detachstack(Client* c)
     for (tc = &c->mon->stack; *tc && *tc != c; tc = &(*tc)->snext);
     *tc = c->snext;
 
-    for (t = c->mon->stack; t && !ISVISIBLE(t); t = t->snext);
-    
     for (dp = c->devstack; dp; dp = dp->next) {
+
+        for (t = dp->selmon->stack; t && !ISVISIBLE(t); t = t->snext);
+    
         if(dp->resize.c || dp->move.c)
         {
             dp->resize.c = NULL;
@@ -2808,6 +2813,14 @@ togglefloating(DevPair* dp, const Arg * arg)
 }
 
 void
+togglefullscreen(DevPair* dp, const Arg *arg)
+{
+    if (!dp->selmon || !dp->sel)
+        return;
+    setfullscreen(dp->sel, !dp->sel->isfullscreen);
+}
+
+void
 toggleautoswapmon(DevPair* dp, const Arg * __attribute__((unused)) arg)
 {
     Clr** cur_scheme;
@@ -2942,6 +2955,7 @@ unfocus(DevPair* dp, Client* c, int setfocus)
     
     if (!dp || !dp->sel)
         return;
+
     if(c) {
         grabbuttons(dp->mptr, c, 0);
         if(c->isfloating)
