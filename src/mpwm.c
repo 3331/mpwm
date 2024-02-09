@@ -371,7 +371,6 @@ static Display *dpy;
 static Drw *drw;
 static Monitor* mons, *mons_end, *spawnmon, *forcedfocusmon;
 static DevPair* devpairs,* spawndev;
-static Device* floatingdevs;
 static Window root, wmcheckwin, lowest_barwin = None, highest_barwin = None, floating_stack_helper = None;
 static XIGrabModifiers anymodifier[] = { { XIAnyModifier, 0 } };
 static unsigned char hcmask[XIMaskLen(XI_HierarchyChanged)] = {0};
@@ -629,7 +628,6 @@ xi2buttonrelease(void* ev)
     XIDeviceEvent* e = ev;
     DevPair* dp = getdevpair(e->deviceid);
     Client** pc;
-    Monitor* m;
     Motion* mm;
 
     dp->lastevent = e->time;
@@ -749,8 +747,6 @@ unlinkmon(Monitor* m)
 void
 cleanupmon(Monitor *m)
 {
-    Monitor *mon;
-
     unlinkmon(m);
 
     XUnmapWindow(dpy, m->barwin);
@@ -1044,8 +1040,6 @@ drawbar(Monitor* m)
     unsigned int i, occ = 0, urg = 0, selt = 0;
     Client *c;
     DevPair* dp;
-    DevPair* mdp;
-    DevPair* cdp;
     Clr ** cur_scheme;
 
     if(m == forcedfocusmon)
@@ -1498,7 +1492,6 @@ xi2hierarchychanged(void* ev)
 {
     DBG("+ xi2hierarchychanged\n");
     int i, x, y, idx;
-    DevPair **pdp;
     DevPair *dp;
     Device **pd;
     Device *d;
@@ -1797,19 +1790,19 @@ tile(Monitor *m)
         return;
 
     if (n > m->nmaster)
-        mw = m->nmaster ? (m->ww + gappx*ie) * (m->rmaster ? 1.0 - m->mfact : m->mfact) : 0;
+        mw = m->nmaster ? (m->ww + gappx * ie) * (m->rmaster ? 1.0 - m->mfact : m->mfact) : 0;
     else
         mw = m->ww - 2 * gappx * oe + gappx * ie;
     for (i = 0, my = ty = gappx*oe, c = nexttiled(m->clients); c; c = nexttiled(c->next), i++)
         if (i < m->nmaster) {
             r = MIN(n, m->nmaster) - i;
-            h = (m->wh - my - gappx*oe - gappx*ie * (r - 1)) / r;
-            resize(c, m->rmaster ? m->wx + m->ww - mw : m->wx + gappx*oe, m->wy + my, mw - (2*c->bw) - gappx*ie, h - (2*c->bw), 0);
-            my += HEIGHT(c) + gappx*ie;
+            h = (m->wh - my - gappx * oe - gappx * ie * (r - 1)) / r;
+            resize(c, m->rmaster ? m->wx + m->ww - mw : m->wx + gappx * oe, m->wy + my, mw - (2 * c->bw) - gappx * ie, h - (2 * c->bw), 0);
+            my += HEIGHT(c) + gappx * ie;
         } else {
             r = n - i;
             h = (m->wh - ty - gappx*oe - gappx*ie * (r - 1)) / r;
-            resize(c, m->rmaster ? m->wx : m->wx + mw + gappx*oe, m->wy + ty, m->ww - mw - (2*c->bw) - 2*gappx*oe, h - (2*c->bw), 0);
+            resize(c, m->rmaster ? m->wx : m->wx + mw + gappx * oe, m->wy + ty, m->ww - mw - (2 * c->bw) - 2*gappx * oe, h - (2 * c->bw), 0);
             ty += HEIGHT(c) + gappx*ie;
         }
 }
@@ -2182,7 +2175,7 @@ restack(Monitor* m)
 }
 
 #ifdef DEBUG
-void
+__attribute__((unused)) void
 updatedebuginfo(void)
 {
     DevPair* dp;
@@ -2379,7 +2372,6 @@ setmfact(DevPair* dp, const Arg *arg)
 void
 format_client_prefix_name(Client* c)
 {
-    DevPair **tdp;
     DevPair* dp;
     int ri = 0, fi = 0;
     int i;
@@ -2449,7 +2441,6 @@ setselmon(DevPair* dp, Monitor* m)
     DevPair* ndp;
     int cur_bar_offset;
     int tar_bar_offset;
-    int gotrootptr;
 
     if(dp->selmon == m)
         return;
@@ -2457,7 +2448,6 @@ setselmon(DevPair* dp, Monitor* m)
     if(forcedfocusmon && m != forcedfocusmon)
     {
         forcing_focus = 1;
-        Monitor* mouse_mon = NULL;
         Monitor* tar = m;
         Monitor* tar2 = NULL;
         int x, y;
@@ -2720,8 +2710,7 @@ showhide(Client *c)
 void
 spawn(DevPair* dp, const Arg *arg)
 {
-    pid_t pid1;
-    pid_t pid2;
+    pid_t child;
     int status;
     struct sigaction sa;
 
@@ -2733,8 +2722,8 @@ spawn(DevPair* dp, const Arg *arg)
     spawnmon = dp->selmon;
     spawndev = dp;
 
-    if ((pid1 = fork())) {
-        waitpid(pid1, &status, 0);
+    if ((child = fork())) {
+        waitpid(child, &status, 0);
     }
     else
     {
