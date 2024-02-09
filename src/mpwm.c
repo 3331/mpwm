@@ -513,8 +513,7 @@ arrange(Monitor* m)
 void
 arrangemon(Monitor *m)
 {
-    
-    strncpy(m->ltsymbol, m->lt[m->sellt]->symbol, sizeof(m->ltsymbol));
+    strncpy(m->ltsymbol, m->lt[m->sellt]->symbol, sizeof(m->ltsymbol) - 1);
     if (m->lt[m->sellt]->arrange)
         m->lt[m->sellt]->arrange(m);
 }
@@ -1097,11 +1096,11 @@ drawbar(Monitor* m)
             if (!c->devices)
                 continue;
             if (!i) {
-                if ((rfti = snprintf(&focus_text[fti], sizeof(focus_text) - fti, "%s - %s", c->prefix_name, c->name)) < 0)
+                if ((rfti = snprintf(&focus_text[fti], sizeof(focus_text) - fti, "%s - %d - %s", c->prefix_name, m->nmaster, c->name)) < 0)
                     break;
             }
             else {
-                if ((rfti = snprintf(&focus_text[fti], sizeof(focus_text) - fti, " | %s - %s", c->prefix_name, c->name)) < 0)
+                if ((rfti = snprintf(&focus_text[fti], sizeof(focus_text) - fti, " | %s - %d - %s", c->prefix_name, m->nmaster, c->name)) < 0)
                     break;
             }
             fti += rfti;
@@ -1800,7 +1799,7 @@ tile(Monitor *m)
     if (n > m->nmaster)
         mw = m->nmaster ? (m->ww + gappx*ie) * (m->rmaster ? 1.0 - m->mfact : m->mfact) : 0;
     else
-        mw = m->ww - 2*gappx*oe + gappx*ie;
+        mw = m->ww - 2 * gappx * oe + gappx * ie;
     for (i = 0, my = ty = gappx*oe, c = nexttiled(m->clients); c; c = nexttiled(c->next), i++)
         if (i < m->nmaster) {
             r = MIN(n, m->nmaster) - i;
@@ -1950,7 +1949,7 @@ xi2motion(void *ev)
 }
 
 void
-movemouse(DevPair* dp, const Arg * __attribute__((unused)) arg)
+movemouse(DevPair* dp, __attribute__((unused)) const Arg * arg)
 {
     Client* c;
     if (!(c = dp->move.c) && !(c = dp->sel))
@@ -1996,7 +1995,7 @@ movemouse(DevPair* dp, const Arg * __attribute__((unused)) arg)
 }
 
 void
-resizemouse(DevPair* dp, const Arg * __attribute__((unused)) arg)
+resizemouse(DevPair* dp, __attribute__((unused)) const Arg * arg)
 {
     Client *c;
     if (!(c = dp->resize.c) && !(c = dp->sel))
@@ -2098,7 +2097,7 @@ propertynotify(XEvent *e)
 }
 
 void
-quit(DevPair * __attribute__((unused)) dp, const Arg * __attribute__((unused)) arg)
+quit(__attribute__((unused)) DevPair * dp, __attribute__((unused)) const Arg * arg)
 {
     running = 0;
 }
@@ -2196,9 +2195,11 @@ updatedebuginfo(void)
         for (c = m->stack; c; c = c->snext) {
             DBG("    [%d%s] Client %ld (title: %s, devices: %d)\n", cn, m->stack == c ? " - STACK" : "", c->win, c->name, c->devices);
             i = 0;
-            for (dp = devpairs; dp; dp = dp->next, i++)
-                if (dp->sel == c)
+            for (dp = devpairs; dp; dp = dp->next, i++) {
+                if (dp->sel == c) {
                     DBG("        [%d] Device %d (use: %d, dirty sel: %d)\n", i, i, dp->mkbd->info.use, dp->dirty_sel);
+                }
+            }
             cn++;
         }
         mn++;
@@ -2352,7 +2353,8 @@ setlayout(DevPair* dp, const Arg *arg)
         dp->selmon->sellt ^= 1;
     if (arg && arg->v)
         dp->selmon->lt[dp->selmon->sellt] = (Layout *)arg->v;
-    strncpy(dp->selmon->ltsymbol, dp->selmon->lt[dp->selmon->sellt]->symbol, sizeof(dp->selmon->ltsymbol));
+
+    strncpy(dp->selmon->ltsymbol, dp->selmon->lt[dp->selmon->sellt]->symbol, sizeof(dp->selmon->ltsymbol) - 1);
     if (dp->sel)
         arrange(dp->selmon);
     else
@@ -2778,7 +2780,7 @@ tagmon(DevPair* dp, const Arg *arg)
 }
 
 void
-togglebar(DevPair* dp, const Arg * __attribute__((unused)) arg)
+togglebar(DevPair* dp, __attribute__((unused)) const Arg * arg)
 {
     if(!dp->selmon)
         return;
@@ -2813,7 +2815,7 @@ togglefloating(DevPair* dp, const Arg * arg)
 }
 
 void
-togglefullscreen(DevPair* dp, const Arg *arg)
+togglefullscreen(DevPair* dp, __attribute__((unused)) const Arg *arg)
 {
     if (!dp->selmon || !dp->sel)
         return;
@@ -2821,7 +2823,7 @@ togglefullscreen(DevPair* dp, const Arg *arg)
 }
 
 void
-toggleautoswapmon(DevPair* dp, const Arg * __attribute__((unused)) arg)
+toggleautoswapmon(DevPair* dp, __attribute__((unused)) const Arg * arg)
 {
     Clr** cur_scheme;
     Monitor* fake_tar;
@@ -2871,7 +2873,7 @@ toggleautoswapmon(DevPair* dp, const Arg * __attribute__((unused)) arg)
 }
 
 void
-togglermaster(DevPair* dp, const Arg * __attribute__((unused)) arg)
+togglermaster(DevPair* dp, __attribute__((unused)) const Arg * arg)
 {
     dp->selmon->rmaster = !dp->selmon->rmaster;
     dp->selmon->mfact = 1.0 - dp->selmon->mfact;
@@ -2880,7 +2882,7 @@ togglermaster(DevPair* dp, const Arg * __attribute__((unused)) arg)
 }
 
 void
-togglemouse(DevPair* dp, const Arg * __attribute__((unused)) arg)
+togglemouse(DevPair* dp, __attribute__((unused)) const Arg * arg)
 {
     if (!dp->selmon || !dp->sel)
         return;
@@ -2935,7 +2937,7 @@ view(DevPair* dp, const Arg *arg)
 }
 
 void
-zoom(DevPair* dp, const Arg * __attribute__((unused)) arg)
+zoom(DevPair* dp, __attribute__((unused)) const Arg * arg)
 {
     Client* c = dp->sel;
 
@@ -3368,7 +3370,7 @@ xerror(Display *dpy, XErrorEvent *ee)
 }
 
 int
-xerrordummy(Display * __attribute__((unused)) dpy, XErrorEvent * __attribute__((unused)) ee)
+xerrordummy(__attribute__((unused)) Display * dpy, __attribute__((unused)) XErrorEvent * ee)
 {
     return 0;
 }
@@ -3376,7 +3378,7 @@ xerrordummy(Display * __attribute__((unused)) dpy, XErrorEvent * __attribute__((
 /* Startup Error handler to check if another window manager
  * is already running. */
 int
-xerrorstart(Display * __attribute__((unused)) dpy, XErrorEvent * __attribute__((unused)) ee)
+xerrorstart(__attribute__((unused)) Display * dpy, __attribute__((unused)) XErrorEvent * ee)
 {
     die("mpwm: another window manager is already running");
     return -1;

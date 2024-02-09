@@ -42,7 +42,7 @@ die(const char *fmt, ...) {
     exit(1);
 }
 
-void inline
+inline void
 swap_float(float* a, float* b)
 {
     float tmp = *a;
@@ -50,7 +50,7 @@ swap_float(float* a, float* b)
     *b = tmp;
 }
 
-void inline
+inline void
 swap_int(int* a, int* b)
 {
     int tmp = *a;
@@ -58,7 +58,7 @@ swap_int(int* a, int* b)
     *b = tmp;
 }
 
-void inline
+inline void
 swap_uint32(uint32_t* a, uint32_t* b)
 {
     uint32_t tmp = *a;
@@ -66,7 +66,7 @@ swap_uint32(uint32_t* a, uint32_t* b)
     *b = tmp;
 }
 
-void inline
+inline void
 swap_void(void** a, void** b)
 {
     void* tmp = *a;
@@ -74,7 +74,7 @@ swap_void(void** a, void** b)
     *b = tmp;
 }
 
-void inline
+inline void
 swap_ulong(unsigned long* a, unsigned long* b)
 {
     unsigned long tmp = *a;
