@@ -2,7 +2,7 @@
 VERSION = 1.2
 
 # Compiler/linker
-CC              := /usr/bin/clang-14
+CC              := /usr/bin/cc
 TARGET          := mpwm
 PREFIX          := /usr/local
 
@@ -25,8 +25,7 @@ DEPDIRS         = $(shell dirname ${DEPS} | sort -u)
 # Flags
 INCLUDES        = -I/usr/include/freetype2
 DEPFLAGS        = -MT $@ -MMD -MP -MF ${DEPDIR}/$*.d
-CFLAGS          := -O3 -march=native -pedantic -Wall -Wextra -flto=full -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_POSIX_C_SOURCE=2 -DVERSION=\"${VERSION}\" -DXINERAMA ${INCLUDES}
-CFLAGS_WARNINGS := -Wno-unused-function -Wno-pointer-to-int-cast -Wno-unused-variable -Wno-division-by-zero
+CFLAGS          := -O3 -march=native -pedantic -Wall -Wextra -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_POSIX_C_SOURCE=2 -DVERSION=\"${VERSION}\" -DXINERAMA ${INCLUDES}
 LDFLAGS         := -flto=full -lX11 -lXi -lXinerama -lfontconfig -lXft -lXrender
 
 .PHONY: all clean
@@ -42,7 +41,7 @@ ${TARGET}: ${OBJS}
 
 # Generic source -> object target
 ${OBJDIR}/%.o: %.c | ${OBJDIRS} ${DEPDIRS}
-	${CC} ${DEPFLAGS} -c ${CFLAGS} ${CFLAGS_WARNINGS} -o $@ $<
+	${CC} ${DEPFLAGS} -c ${CFLAGS} -o $@ $<
 
 install: all
 	sudo mkdir -p "${DESTDIR}${PREFIX}/bin"
