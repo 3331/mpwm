@@ -142,7 +142,7 @@ typedef struct Monitor_t {
     DevPair* devstack;
     char ltsymbol[16];
     float mfact;
-    uint32_t nmaster;
+    int nmaster;
     int num;
     int by;               /* bar geometry */
     int mx, my, mw, mh;   /* screen size */
@@ -1217,7 +1217,7 @@ swapmon(DevPair* dp, const Arg *arg)
 
     unfocus(dp, dp->sel, 0);
 
-    swap_uint32(&cur->nmaster, &tar->nmaster);
+    swap_int(&cur->nmaster, &tar->nmaster);
     swap_ulong(&cur->barwin, &tar->barwin);
     swap_float(&cur->mfact, &tar->mfact);
     swap_int(&cur->rmaster, &tar->rmaster);
@@ -1782,10 +1782,11 @@ monocle(Monitor *m)
 void
 tile(Monitor *m)
 {
-    unsigned int i, n, h, r, oe = 1, ie = 1, mw, my, ty;
+    int h, r, mw, my, ty, i, n, oe = 1, ie = 1;
     Client *c;
 
     for (n = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), n++);
+
     if (n == 0)
         return;
 
@@ -1793,7 +1794,8 @@ tile(Monitor *m)
         mw = m->nmaster ? (m->ww + gappx * ie) * (m->rmaster ? 1.0 - m->mfact : m->mfact) : 0;
     else
         mw = m->ww - 2 * gappx * oe + gappx * ie;
-    for (i = 0, my = ty = gappx*oe, c = nexttiled(m->clients); c; c = nexttiled(c->next), i++)
+    
+    for (i = 0, my = ty = gappx * oe, c = nexttiled(m->clients); c; c = nexttiled(c->next), i++) {
         if (i < m->nmaster) {
             r = MIN(n, m->nmaster) - i;
             h = (m->wh - my - gappx * oe - gappx * ie * (r - 1)) / r;
@@ -1801,16 +1803,18 @@ tile(Monitor *m)
             my += HEIGHT(c) + gappx * ie;
         } else {
             r = n - i;
-            h = (m->wh - ty - gappx*oe - gappx*ie * (r - 1)) / r;
-            resize(c, m->rmaster ? m->wx : m->wx + mw + gappx * oe, m->wy + ty, m->ww - mw - (2 * c->bw) - 2*gappx * oe, h - (2 * c->bw), 0);
-            ty += HEIGHT(c) + gappx*ie;
+            h = (m->wh - ty - gappx * oe - gappx * ie * (r - 1)) / r;
+            resize(c, m->rmaster ? m->wx : m->wx + mw + gappx * oe, m->wy + ty, m->ww - mw - (2 * c->bw) - 2 * gappx * oe, h - (2 * c->bw), 0);
+            ty += HEIGHT(c) + gappx * ie;
         }
+    }
 }
 
 void
 centeredmaster(Monitor *m)
 {
-    unsigned int i, n, h, mw, mx, my, oty, ety, tw;
+    int h, mw, mx, my, oty, ety, tw;
+    int i, n, nm;
     Client *c;
 
     /* count number of clients in the selected monitor */
@@ -1824,12 +1828,15 @@ centeredmaster(Monitor *m)
     my = 0;
     tw = mw;
 
-    if (n > m->nmaster) {
+    /* keep things centered if possible */
+    nm = MIN(m->nmaster, MAX(n - 2, 0));
+
+    if (n > nm) {
         /* go mfact box in the center if more than nmaster clients */
-        mw = m->nmaster ? m->ww * m->mfact : 0;
+        mw = nm ? m->ww * m->mfact : 0;
         tw = m->ww - mw;
 
-        if (n - m->nmaster > 1) {
+        if (n - nm > 1) {
             /* only one client */
             mx = (m->ww - mw) / 2;
             tw = (m->ww - mw) / 2;
@@ -1839,16 +1846,16 @@ centeredmaster(Monitor *m)
     oty = 0;
     ety = 0;
     for (i = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), i++)
-    if (i < m->nmaster) {
+    if (i < nm) {
         /* nmaster clients are stacked vertically, in the center
          * of the screen */
-        h = (m->wh - my) / (MIN(n, m->nmaster) - i);
+        h = (m->wh - my) / (MIN(n, nm) - i);
         resize(c, m->wx + mx, m->wy + my, mw - (2*c->bw),
                h - (2*c->bw), 0);
         my += HEIGHT(c);
     } else {
         /* stack clients are stacked vertically */
-        if ((i - m->nmaster) % 2 ) {
+        if ((i - nm) % 2 ) {
             h = (m->wh - ety) / ( (1 + n - i) / 2);
             resize(c, m->wx, m->wy + ety, tw - (2*c->bw),
                    h - (2*c->bw), 0);
@@ -2485,7 +2492,7 @@ setselmon(DevPair* dp, Monitor* m)
 
         XSync(dpy, False);
         
-        swap_uint32(&cur->nmaster, &tar->nmaster);
+        swap_int(&cur->nmaster, &tar->nmaster);
         swap_ulong(&cur->barwin, &tar->barwin);
         swap_float(&cur->mfact, &tar->mfact);
         swap_int(&cur->rmaster, &tar->rmaster);
@@ -2501,7 +2508,7 @@ setselmon(DevPair* dp, Monitor* m)
         
         if(tar2)
         {
-            swap_uint32(&cur->nmaster, &tar->nmaster);
+            swap_int(&cur->nmaster, &tar->nmaster);
             swap_ulong(&cur->barwin, &tar2->barwin);
             swap_float(&cur->mfact, &tar->mfact);
             swap_int(&cur->rmaster, &tar->rmaster);
