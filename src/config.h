@@ -1,9 +1,9 @@
 /* See LICENSE file for copyright and license details. */
 
 /* appearance */
-static const unsigned int borderpx  = 3;        /* border pixel of windows */
-static const unsigned int gappx     = 2;       /* gap amount in pixels between clients */
-static const int snap               = 10;       /* snap pixel */
+static const unsigned int borderpx  = 2;        /* border pixel of windows */
+static const unsigned int gappx     = 0;        /* gap amount in pixels between clients */
+static const int snap               = 5;        /* snap pixel */
 static const int rmaster            = 0;        /* 1 means master-area is initially on the right */
 static const int showbar            = 1;        /* 0 means no bar */
 static const int topbar             = 1;        /* 0 means bottom bar */
@@ -92,6 +92,7 @@ static const Key keys[] = {
     { MODKEY,                       XK_m,      setlayout,         {.v = &layouts[2]} },
     { MODKEY,                       XK_o,      setlayout,         {.v = &layouts[3]} },
     { MODKEY|ShiftMask,             XK_space,  togglefloating,    {0} },
+    { MODKEY|ShiftMask,             XK_f,      togglefullscreen,  {0} },
     { MODKEY|ShiftMask,             XK_s,      toggleautoswapmon, {0} },
     { MODKEY,                       XK_0,      view,              {.ui = ~0 } },
     { MODKEY|ShiftMask,             XK_0,      tag,               {.ui = ~0 } },
