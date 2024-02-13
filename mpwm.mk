@@ -7,7 +7,7 @@ TARGET          := mpwm
 PREFIX          := /usr/local
 
 # Files
-SRCS            = $(wildcard src/*.c)
+SRCS            = src/util.c src/drw.c src/mpwm.c  src/cmds.c 
 
 # Auto files
 BUILD_TYPE      := Unknown

@@ -2412,7 +2412,8 @@ setfullscreen(Client *c, int fullscreen)
 {
     XWindowChanges wc;
 
-    if (fullscreen && !c->isfullscreen) {
+    if (fullscreen && !c->isfullscreen)
+    {
         XChangeProperty(dpy, c->win, netatom[NetWMState], XA_ATOM, 32, PropModeReplace, (unsigned char*)&netatom[NetWMFullscreen], 1);
         c->isfullscreen = 1;
         c->oldstate = c->isfloating;
@@ -2423,7 +2424,9 @@ setfullscreen(Client *c, int fullscreen)
         wc.stack_mode = Above;
         wc.sibling = floating_stack_helper;
         XConfigureWindow(dpy, c->win, CWSibling|CWStackMode, &wc);
-    } else if (!fullscreen && c->isfullscreen){
+    }
+    else if (!fullscreen && c->isfullscreen)
+    {
         XChangeProperty(dpy, c->win, netatom[NetWMState], XA_ATOM, 32, PropModeReplace, (unsigned char*)0, 0);
         c->isfullscreen = 0;
         c->isfloating = c->oldstate;
@@ -2435,7 +2438,10 @@ setfullscreen(Client *c, int fullscreen)
         if(c->isfloating)
             resizeclient(c, c->x, c->y, c->w, c->h);
         else
+        {
+            c->dirty_resize = True;
             arrange(c->mon);
+        }
     }
 }
 
