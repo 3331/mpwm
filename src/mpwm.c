@@ -290,7 +290,9 @@ static void setsel(DevPair* dp, Client* c);
 static void setselmon(DevPair* dp, Monitor* m);
 static int getrootptr(DevPair* dp, int* x, int* y);
 static int updategeom(DevPair* dp);
+#ifdef DEBUG
 static void updatedebuginfo(void);
+#endif
 
 /* function declarations */
 static void drawbars(void);
@@ -2017,7 +2019,9 @@ movemouse(DevPair* dp, __attribute__((unused)) const Arg * arg)
 {
     Client* c;
     if (!(c = dp->move.c) && !(c = dp->sel))
+    {
         return;
+    }
     
     if(dp->resize.c)
     {
@@ -2184,7 +2188,7 @@ void
 resize(Client *c, int x, int y, int w, int h, int interact)
 {
     DBG("+resize %lu %d, %d, %d, %d\n", c->win, x, y, w, h);
-    if (c->dirty_resize || applysizehints(c, &x, &y, &w, &h, interact))
+    if (applysizehints(c, &x, &y, &w, &h, interact) || c->dirty_resize)
     {
         c->dirty_resize = False;
         resizeclient(c, x, y, w, h);
