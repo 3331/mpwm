@@ -1642,6 +1642,7 @@ manage(Window w, XWindowAttributes *wa)
     XWindowChanges wc;
     DevPair* dp;
     Clr** cur_scheme;
+    int window_type;
 
     DBG("+manage %lu\n", w);
 
@@ -1677,16 +1678,18 @@ manage(Window w, XWindowAttributes *wa)
         c->x = c->mon->wx + c->mon->ww - WIDTH(c);
     if (c->y + HEIGHT(c) > c->mon->wy + c->mon->wh)
         c->y = c->mon->wy + c->mon->wh - HEIGHT(c);
+
     c->x = MAX(c->x, c->mon->wx);
     c->y = MAX(c->y, c->mon->wy);
     c->bw = borderpx;
 
-    if(!updatewindowtype(c))
+    if((window_type = updatewindowtype(c)) < 2)
     {
         wc.border_width = c->bw;
         XConfigureWindow(dpy, w, CWBorderWidth, &wc);
         XSetWindowBorder(dpy, w, cur_scheme[SchemeNorm][ColBorder].pixel);
-        configure(c); /* propagates border_width, if size doesn't change */
+        if(!window_type)
+            configure(c); /* propagates border_width, if size doesn't change */
     }
 
     updatesizehints(c);
@@ -2495,7 +2498,7 @@ setsel(DevPair* dp, Client* c)
     
     if (dp->sel) {
         dp->sel->devices--;
-        if(!updatewindowtype(dp->sel))
+        if(updatewindowtype(dp->sel) < 2)
             XSetWindowBorder(dpy, dp->sel->win, cur_scheme[CLAMP(SchemeNorm + dp->sel->devices, SchemeNorm, SchemeSel3)][ColBorder].pixel);
         for (tdp = &dp->sel->devstack; *tdp && *tdp != dp; tdp = &(*tdp)->fnext);
         *tdp = dp->fnext;
@@ -2507,7 +2510,7 @@ setsel(DevPair* dp, Client* c)
 
     if (dp->sel) {
         dp->sel->devices++;
-        if(!updatewindowtype(dp->sel))
+        if(updatewindowtype(dp->sel) < 2)
             XSetWindowBorder(dpy, dp->sel->win, cur_scheme[CLAMP(SchemeNorm + dp->sel->devices, SchemeNorm, SchemeSel3)][ColBorder].pixel);
         for (ndp = dp->sel->devstack; ndp && ndp->fnext; ndp = ndp->fnext);
         if (ndp)
@@ -2938,7 +2941,7 @@ toggleautoswapmon(DevPair* dp, __attribute__((unused)) const Arg * arg)
         forcedfocusmon = dp->selmon;
     }
 
-    if(dp->sel && !updatewindowtype(dp->sel))
+    if(dp->sel && updatewindowtype(dp->sel) < 2)
         XSetWindowBorder(dpy, dp->sel->win, cur_scheme[CLAMP(SchemeNorm + dp->sel->devices, SchemeNorm, SchemeSel3)][ColBorder].pixel);
     
     if(getrootptr(dp, &x, &y) && (fake_tar = recttomon(dp, x, y, 1, 1)) != dp->selmon)
@@ -3465,7 +3468,7 @@ updatewindowtype(Client *c)
     if (state == netatom[NetWMFullscreen])
     {
         setfullscreen(c, 1);
-        ret = 1;
+        ret = 2;
     }
 
     if (wtype == netatom[NetWMWindowTypeDialog])
