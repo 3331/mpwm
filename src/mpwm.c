@@ -16,10 +16,11 @@
  * on each monitor. Each client contains a bit array to indicate the tags of a
  * client.
  *
- * Keys and tagging rules are organized as arrays and defined in config.h.
+ * Keys and tagging are organized as arrays and defined in config.h.
  *
  * To understand everything else, start reading main().
  */
+#include <X11/X.h>
 #include <errno.h>
 #include <locale.h>
 #include <signal.h>
@@ -193,15 +194,6 @@ typedef struct DevPair_t {
     int lastdetail;
 } DevPair;
 
-typedef struct {
-    const char *class;
-    const char *instance;
-    const char *title;
-    unsigned int tags;
-    int isfloating;
-    int monitor;
-} Rule;
-
 /* function declarations (commandable) */
 static void focusmon(DevPair* dp, const Arg *arg);
 static void swapmon(DevPair* dp, const Arg *arg);
@@ -235,10 +227,10 @@ static int sendevent(Window w, Atom proto);
 static void setclientstate(Client *c, long state);
 static void seturgent(Client *c, int urg);
 static void setfullscreen(Client *c, int fullscreen);
+static void setfloating(Client *c, int floating, int force, int should_arrange);
 static void resize(Client *c, int x, int y, int w, int h, int interact);
 static void resizeclient(Client *c, int x, int y, int w, int h);
 static int applysizehints(Client *c, int *x, int *y, int *w, int *h, int interact);
-static void applyrules(Client *c);
 static void attach(Client *c);
 static void append(Client *c);
 static void attachstack(Client *c);
@@ -271,7 +263,6 @@ static Monitor *recttomon(DevPair* dp, int x, int y, int w, int h);
 static void arrange(Monitor *m);
 static void arrangemon(Monitor *m);
 static void drawbar(Monitor *m);
-static void restack(Monitor* m);
 static void updatebarpos(Monitor *m);
 static void insertmon(Monitor* at, Monitor* m);
 static void unlinkmon(Monitor* m);
@@ -393,42 +384,6 @@ int log_fd = 2;
 struct NumTags { char limitexceeded[LENGTH(tags) > 31 ? -1 : 1]; };
 
 /* function implementations */
-void
-applyrules(Client *c)
-{
-    const char *class, *instance;
-    unsigned int i;
-    const Rule *r;
-    Monitor *m;
-    XClassHint ch = { NULL, NULL };
-
-    /* rule matching */
-    c->isfloating = 0;
-    c->tags = 0;
-    XGetClassHint(dpy, c->win, &ch);
-    class    = ch.res_class ? ch.res_class : broken;
-    instance = ch.res_name  ? ch.res_name  : broken;
-
-    for (i = 0; i < LENGTH(rules); i++) {
-        r = &rules[i];
-        if ((!r->title || strstr(c->name, r->title))
-        && (!r->class || strstr(class, r->class))
-        && (!r->instance || strstr(instance, r->instance)))
-        {
-            c->isfloating = r->isfloating;
-            c->tags |= r->tags;
-            for (m = mons; m && m->num != r->monitor; m = m->next);
-            if (m)
-                c->mon = m;
-        }
-    }
-    if (ch.res_class)
-        XFree(ch.res_class);
-    if (ch.res_name)
-        XFree(ch.res_name);
-    c->tags = c->tags & TAGMASK ? c->tags & TAGMASK : c->mon->tagset[c->mon->seltags];
-}
-
 int
 applysizehints(Client *c, int * __restrict x, int * __restrict y, int * __restrict w, int * __restrict h, int interact)
 {
@@ -504,16 +459,15 @@ arrange(Monitor* m)
 
     if (m)
         showhide(m->stack);
-    else for (m = mons; m; m = m->next)
-        showhide(m->stack);
+    else
+        for (m = mons; m; m = m->next)
+            showhide(m->stack);
     
     if (m)
-    {
         arrangemon(m);
-        restack(m);
-    }
-    else for (m = mons; m; m = m->next)
-        arrangemon(m);
+    else
+        for (m = mons; m; m = m->next)
+            arrangemon(m);
 }
 
 void
@@ -1154,9 +1108,7 @@ xi2enter(void *ev)
 
 void
 focus(DevPair* dp, Client *c)
-{
-    XWindowChanges wc;
-    
+{    
     DBG("+focus %lu -> %lu\n", dp->sel ? dp->sel->win : 0, c ? c->win : 0);
 
     if(c && dp->sel == c)
@@ -1180,14 +1132,6 @@ focus(DevPair* dp, Client *c)
 
         grabbuttons(dp->mptr, c, 1);
         setfocus(dp, c);
-
-        // make sure focused window goes over other floating windows
-        if(c->isfloating)
-        {
-            wc.stack_mode = Above;
-            wc.sibling = floating_stack_helper;
-            XConfigureWindow(dpy, c->win, CWSibling|CWStackMode, &wc);
-        }
     } else {
         XISetFocus(dpy, dp->mkbd->info.deviceid, root, CurrentTime);
         XISetClientPointer(dpy, None, dp->mptr->info.deviceid);
@@ -1289,7 +1233,6 @@ focusstack(DevPair* dp, const Arg *arg)
 
     if (c) {
         focus(dp, c);
-        restack(dp->selmon);
     }
 }
 
@@ -1300,6 +1243,9 @@ cyclestack(DevPair* dp, const Arg * arg)
 
     /* TODO: hide fullscreen apps instead and show something somewhere
      * so user knows if theres a fullscreen app in the background
+     *
+     * its kinda broken right now, need to figure out what to do with
+     * floating windows
     */
 
     if (!dp || !dp->sel || !dp->selmon || (dp->sel->isfullscreen && lockfullscreen))
@@ -1715,8 +1661,8 @@ manage(Window w, XWindowAttributes *wa)
         c->tags = t->tags;
     } else if (spawndev && spawndev->selmon) {
         c->mon = spawnmon ? spawnmon : spawndev->selmon;
+        c->tags = c->mon->tagset[c->mon->seltags];
         spawnmon = NULL;
-        applyrules(c);
     } else {
         die("could not find monitor for client\n");
     }
@@ -1764,10 +1710,10 @@ manage(Window w, XWindowAttributes *wa)
         return;
     }
 
+    setfloating(c, c->isfloating, 1, 0);
+
     if(!c->isfloating && !c->isfullscreen)
         arrange(c->mon);
-    else
-        restack(c->mon);
 
     if(!c->isfloating)
         focus(spawndev, NULL);
@@ -1969,44 +1915,60 @@ xi2motion(void *ev)
         }
     }
 
-    if ((c = dp->move.c) && dp->resize.time < dp->move.time) {
+    if ((c = dp->move.c) && dp->resize.time < dp->move.time)
+    {
         int nx, ny;
+
         if ((e->time - dp->move.time) <= (1000 / 250))
             return;
+
         dp->move.time = e->time;
         nx = dp->move.ox + ((int)e->root_x - dp->move.x);
         ny = dp->move.oy + ((int)e->root_y - dp->move.y);
+
         if (abs(dp->selmon->wx - nx) < snap)
             nx = dp->selmon->wx;
         else if (abs((dp->selmon->wx + dp->selmon->ww) - (nx + WIDTH(c))) < snap)
             nx = dp->selmon->wx + dp->selmon->ww - WIDTH(c);
+
         if (abs(dp->selmon->wy - ny) < snap)
             ny = dp->selmon->wy;
         else if (abs((dp->selmon->wy + dp->selmon->wh) - (ny + HEIGHT(c))) < snap)
             ny = dp->selmon->wy + dp->selmon->wh - HEIGHT(c);
-        if (!c->isfloating && dp->selmon->lt[dp->selmon->sellt]->arrange
-            && (abs(nx - c->x) > snap || abs(ny - c->y) > snap))
-            togglefloating(dp, NULL);
-        if (!dp->selmon->lt[dp->selmon->sellt]->arrange || c->isfloating) {
+
+        if (!c->isfloating && dp->selmon->lt[dp->selmon->sellt]->arrange && (abs(nx - c->x) > snap || abs(ny - c->y) > snap))
+            setfloating(c, 1, 0, 1);
+
+        if (!dp->selmon->lt[dp->selmon->sellt]->arrange || c->isfloating)
+        {
             if(!c->isfullscreen)
                 resize(c, nx, ny, c->w, c->h, 1);
             postmoveselmon(dp, c);
         }
-    } else if ((c = dp->resize.c) && dp->resize.time > dp->move.time) {
+    }
+    else if ((c = dp->resize.c) && dp->resize.time > dp->move.time)
+    {
         int nw, nh;
+
         if ((e->time - dp->resize.time) <= (1000 / 250))
             return;
+
         dp->resize.time = e->time;
         nw = MAX(e->root_x - dp->resize.ox - 2 * c->bw + 1, 1);
         nh = MAX(e->root_y - dp->resize.oy - 2 * c->bw + 1, 1);
-        if (c->mon->wx + nw >= dp->selmon->wx && c->mon->wx + nw <= dp->selmon->wx + dp->selmon->ww
-        && c->mon->wy + nh >= dp->selmon->wy && c->mon->wy + nh <= dp->selmon->wy + dp->selmon->wh)
+
+        if (
+            c->mon->wx + nw >= dp->selmon->wx &&
+            c->mon->wx + nw <= dp->selmon->wx + dp->selmon->ww &&
+            c->mon->wy + nh >= dp->selmon->wy &&
+            c->mon->wy + nh <= dp->selmon->wy + dp->selmon->wh)
         {
-            if (!c->isfloating && dp->selmon->lt[dp->selmon->sellt]->arrange
-            && (abs(nw - c->w) > snap || abs(nh - c->h) > snap))
-                togglefloating(dp, NULL);
+            if (!c->isfloating && dp->selmon->lt[dp->selmon->sellt]->arrange && (abs(nw - c->w) > snap || abs(nh - c->h) > snap))
+                setfloating(c, 1, 0, 1);
         }
-        if (!dp->selmon->lt[dp->selmon->sellt]->arrange || c->isfloating) {
+
+        if (!dp->selmon->lt[dp->selmon->sellt]->arrange || c->isfloating)
+        {
             if(!c->isfullscreen)
                 resize(c, c->x, c->y, nw, nh, 1);
             postmoveselmon(dp, c);
@@ -2143,9 +2105,8 @@ propertynotify(XEvent *e)
         switch(ev->atom) {
         default: break;
         case XA_WM_TRANSIENT_FOR:
-            if (!c->isfloating && (XGetTransientForHint(dpy, c->win, &trans)) &&
-                (c->isfloating = (wintoclient(trans)) != NULL))
-                arrange(c->mon);
+            if (!c->isfloating && (XGetTransientForHint(dpy, c->win, &trans)))
+                setfloating(c, (wintoclient(trans)) != NULL, 0, 1);
             break;
         case XA_WM_NORMAL_HINTS:
             c->hintsvalid = 0;
@@ -2209,61 +2170,6 @@ resizeclient(Client *c, int x, int y, int w, int h)
     XConfigureWindow(dpy, c->win, CWX|CWY|CWWidth|CWHeight|CWBorderWidth, &wc);
     configure(c);
     XSync(dpy, False);
-}
-
-void
-restack(Monitor* m)
-{
-    Client* c = NULL;
-    XWindowChanges wc;
-    XEvent ev;
-    DevPair* dp;
-    
-    DBG("+restack\n");
-
-    for (dp = devpairs; dp; dp = dp->next)
-    {
-        if (dp->selmon == m)
-        {
-            // make sure focused floating windows stay on top
-            if(dp->sel && dp->sel->mon == m)
-            {
-                c = dp->sel;
-                /* TODO: only need to do this once per unique client */
-                if (c->isfloating || !m->lt[m->sellt]->arrange)
-                {
-                    wc.stack_mode = Above;
-                    wc.sibling = floating_stack_helper;
-                    XConfigureWindow(dpy, c->win, CWSibling|CWStackMode, &wc);
-                    DBG("    restack %lu float Above\n", c->win);
-                }
-            }
-
-            // make sure tiled or otherwise managed windows stay below
-            if (m->lt[m->sellt]->arrange)
-            {
-                wc.stack_mode = Below;
-                wc.sibling = lowest_barwin;
-                for (c = m->stack; c; c = c->snext)
-                {
-                    if (!c->isfloating && ISVISIBLE(c))
-                    {
-                        DBG("    restack %lu lowest barwin Below\n", c->win);
-                        XConfigureWindow(dpy, c->win, CWSibling|CWStackMode, &wc);
-                        wc.sibling = c->win;
-                    }
-                }
-            }
-        }
-    }
-
-    XSync(dpy, False);
-    xi2handler[XI_Enter] = NULL;
-    while (XCheckTypedEvent(dpy, GenericEvent, &ev)) {
-        if (legacyhandler[ev.type])
-            legacyhandler[ev.type](&ev); /* call handler */
-    }
-    xi2handler[XI_Enter] = xi2enter;
 }
 
 #ifdef DEBUG
@@ -2370,8 +2276,7 @@ void
 setclientstate(Client *c, long state)
 {
     long data[] = { state, None };
-    XChangeProperty(dpy, c->win, wmatom[WMState], wmatom[WMState], 32,
-        PropModeReplace, (unsigned char *)data, 2);
+    XChangeProperty(dpy, c->win, wmatom[WMState], wmatom[WMState], 32, PropModeReplace, (unsigned char *)data, 2);
 }
 
 int
@@ -2404,10 +2309,20 @@ sendevent(Window w, Atom proto)
 void
 setfocus(DevPair* dp, Client* c)
 {
+    XWindowChanges wc;
+
     if (!c->neverfocus) {
         XISetFocus(dpy, dp->mkbd->info.deviceid, c->win, CurrentTime);
         XISetClientPointer(dpy, c->win, dp->mptr->info.deviceid);
         XChangeProperty(dpy, root, netatom[NetActiveWindow], XA_WINDOW, 32, PropModeReplace, (unsigned char *) &(c->win), 1);
+
+        // make sure focused window goes over other floating windows
+        if(c->isfloating)
+        {
+            wc.stack_mode = Above;
+            wc.sibling = floating_stack_helper;
+            XConfigureWindow(dpy, c->win, CWSibling|CWStackMode, &wc);
+        }
     }
     sendevent(c->win, wmatom[WMTakeFocus]);
 }
@@ -2415,6 +2330,7 @@ setfocus(DevPair* dp, Client* c)
 void
 setfullscreen(Client *c, int fullscreen)
 {
+    DBG("+setfullscreen %lu %d\n", c->win, fullscreen);
     XWindowChanges wc;
 
     if (fullscreen && !c->isfullscreen)
@@ -2429,6 +2345,7 @@ setfullscreen(Client *c, int fullscreen)
         wc.stack_mode = Above;
         wc.sibling = floating_stack_helper;
         XConfigureWindow(dpy, c->win, CWSibling|CWStackMode, &wc);
+        // no need to arrange, fullscreen window is above everything anyway
     }
     else if (!fullscreen && c->isfullscreen)
     {
@@ -2445,8 +2362,41 @@ setfullscreen(Client *c, int fullscreen)
         else
         {
             c->dirty_resize = True;
-            arrange(c->mon);
+            setfloating(c, 0, 1, 1);
         }
+    }
+}
+
+void
+setfloating(Client *c, int floating, int force, int should_arrange)
+{
+    DBG("+setfloating %lu %d, %d, %d\n", c->win, floating, force, should_arrange);
+
+    XWindowChanges wc;
+
+    // force floating on fixed windows
+    floating = c->isfixed ? 1 : floating;
+
+    if (floating && (!c->isfloating || force))
+    {
+        c->isfloating = 1;
+        resize(c, c->x, c->y, c->w, c->h, 0);
+        wc.stack_mode = Above;
+        wc.sibling = floating_stack_helper;
+        XConfigureWindow(dpy, c->win, CWSibling|CWStackMode, &wc);
+
+        if(should_arrange)
+            arrange(c->mon);
+    }
+    else if (!floating && (c->isfloating || force))
+    {
+        c->isfloating = 0;
+        wc.stack_mode = Below;
+        wc.sibling = lowest_barwin;
+        XConfigureWindow(dpy, c->win, CWSibling|CWStackMode, &wc);
+
+        if(should_arrange)
+            arrange(c->mon);
     }
 }
 
@@ -2901,31 +2851,23 @@ togglebar(DevPair* dp, __attribute__((unused)) const Arg * arg)
 }
 
 void
-togglefloating(DevPair* dp, const Arg * arg)
+togglefloating(DevPair* dp, __attribute__((unused)) const Arg * arg)
 {
     if (!dp->selmon || !dp->sel)
         return;
     
-    if (dp->sel->isfullscreen) /* no support for fullscreen windows */
+    // can't toggle floating on a fullscreen window
+    if (dp->sel->isfullscreen) 
         return;
     
-    dp->sel->isfloating = !dp->sel->isfloating || dp->sel->isfixed;
-    
-    // invoked from key combination
-    if(arg && (dp->move.c || dp->resize.c))
+    if(dp->move.c || dp->resize.c)
     {
         dp->move.c = NULL;
         dp->resize.c = NULL;
         XIUngrabDevice(dpy, dp->mptr->info.deviceid, CurrentTime);
     }
     
-    if (dp->sel->isfloating)
-    {
-        resize(dp->sel, dp->sel->x, dp->sel->y,
-            dp->sel->w, dp->sel->h, 0);
-    }
-
-    arrange(dp->selmon);
+    setfloating(dp->sel, !dp->sel->isfloating, 0, 1);
 }
 
 void
@@ -2933,6 +2875,14 @@ togglefullscreen(DevPair* dp, __attribute__((unused)) const Arg *arg)
 {
     if (!dp->selmon || !dp->sel)
         return;
+
+    if(dp->move.c || dp->resize.c)
+    {
+        dp->move.c = NULL;
+        dp->resize.c = NULL;
+        XIUngrabDevice(dpy, dp->mptr->info.deviceid, CurrentTime);
+    }
+
     setfullscreen(dp->sel, !dp->sel->isfullscreen);
 }
 
@@ -3063,16 +3013,21 @@ zoom(DevPair* dp, __attribute__((unused)) const Arg * arg)
     pop(dp, c);
 }
 
+/*
+ * setsel is only necessary when not calling focus after this function 
+ * 
+*/
 void
 unfocus(DevPair* dp, int setfocus)
 {
     XWindowChanges wc;
-    DBG("+unfocus %lu <-> %lu\n", dp->sel ? dp->sel->win : 0, c ? c->win : 0);
+    DBG("+unfocus %lu\n", dp->sel ? dp->sel->win : 0);
     
     if (!dp || !dp->sel)
         return;
 
     grabbuttons(dp->mptr, dp->sel, 0);
+    
     if(dp->sel->isfloating)
     {
         wc.stack_mode = Below;
@@ -3085,8 +3040,6 @@ unfocus(DevPair* dp, int setfocus)
         XISetClientPointer(dpy, None, dp->mptr->info.deviceid);
         XDeleteProperty(dpy, root, netatom[NetActiveWindow]);
     }
-    
-    setsel(dp, NULL);
 }
 
 void
@@ -3127,12 +3080,12 @@ unmanage(Client *c, int destroyed)
     
     updateclientlist();
 
-    // need to rearrange if application is fullscreen, but not if it was floating
+    // fullscreen clients dont rearrange until they are unfullscreened, or unmanaged
     if(!c->isfloating || c->isfullscreen)
         arrange(m);
 
-    free(c);
     DBG("-unmanage %lu %d %d\n", c->win, c->isfloating, c->isfullscreen);
+    free(c);
 }
 
 void
@@ -3180,15 +3133,20 @@ updatebars(void)
     memset(ptrmask, 0, sizeof(ptrmask));
     XISetMask(ptrmask, XI_Motion);
     XISetMask(ptrmask, XI_ButtonPress);
-    for (m = mons; m; m = m->next) {
+
+    for (m = mons; m; m = m->next)
+    {
         if (m->barwin)
             continue;
+
         m->barwin = XCreateWindow(dpy, root, m->wx, m->by, m->ww, bh, 0, DefaultDepth(dpy, screen),
                 CopyFromParent, DefaultVisual(dpy, screen),
                 CWOverrideRedirect|CWBackPixmap|CWEventMask, &wa);
         
         wc.stack_mode = Above;
-        if(highest_barwin == None) {
+
+        if(highest_barwin == None)
+        {
             lowest_barwin = m->barwin;
             wc.sibling = lowest_barwin;
         }
@@ -3196,6 +3154,8 @@ updatebars(void)
             wc.sibling = highest_barwin;
         
         XConfigureWindow(dpy, m->barwin, CWSibling|CWStackMode, &wc);
+
+        // stack barwins right above each other
         highest_barwin = m->barwin;
 
         XDefineCursor(dpy, m->barwin, cursor[CurNormal]->cursor);
@@ -3438,7 +3398,7 @@ updatesizehints(Client *c)
 
     // only allow turning a window in to a floating window
     if(!c->isfloating)
-        c->isfloating = !!(size.flags & (PSize | PWinGravity));
+        setfloating(c, !!(size.flags & (PSize | PWinGravity)), 0, c->ismanaged);
     
     c->hintsvalid = 1;
 }
@@ -3471,7 +3431,7 @@ updatewindowtype(Client *c)
     if (state == netatom[NetWMFullscreen])
         setfullscreen(c, 1);
     if (wtype == netatom[NetWMWindowTypeDialog])
-        c->isfloating = 1;
+        setfloating(c, 1, 0, 1);
 }
 
 void
