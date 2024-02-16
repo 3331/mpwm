@@ -1087,9 +1087,13 @@ xi2enter(void *ev)
     XIEnterEvent* e = ev;
     DevPair* dp = getdevpair(e->deviceid);
 
-    DBG("+xi2enter %lu\n", e->event);
     if ((e->mode != XINotifyNormal || e->detail == XINotifyInferior) && e->event != root)
         return;
+
+    if(forcing_focus)
+        return;
+
+    DBG("+xi2enter %lu\n", e->event);
 
     c = wintoclient(e->event);
     m = c ? c->mon : anywintomon(e->event);
@@ -1140,6 +1144,7 @@ focus(DevPair* dp, Client *c)
 
     setsel(dp, c);
 	drawbars();
+    DBG("-focus\n");
 }
 
 void
@@ -1203,6 +1208,7 @@ swapmon(DevPair* dp, const Arg *arg)
     
     if(forcedfocusmon)
         forcedfocusmon = tar;
+    
     setselmon(dp, tar);
     focus(dp, NULL);
     arrange(tar);
@@ -1893,9 +1899,6 @@ xi2motion(void *ev)
     Window sw;
     DevPair* dp = getdevpair(e->deviceid);
 
-    if(forcing_focus)
-        return;
-        
     if (!e->child) {
         sw = e->event;
         for(m = mons; m; m = m->next) {
@@ -1912,8 +1915,10 @@ xi2motion(void *ev)
         if (!m)
             m = recttomon(dp, e->root_x, e->root_y, 1, 1);
         if (m && m != dp->selmon) {
+            DBG("+xi2motion - sel\n");
             setselmon(dp, m);
             focus(dp, NULL);
+            DBG("-xi2motion - sel\n");
         }
     }
 
@@ -2516,12 +2521,14 @@ setsel(DevPair* dp, Client* c)
 void
 setselmon(DevPair* dp, Monitor* m)
 {
+    DBG("+setselmon\n");
     DevPair **tdp;
     DevPair* ndp;
+    XEvent ev;
     int cur_bar_offset;
     int tar_bar_offset;
 
-    if(dp->selmon == m)
+    if(dp->selmon == m || forcing_focus)
         return;
 
     if(forcedfocusmon && m != forcedfocusmon)
@@ -2539,7 +2546,7 @@ setselmon(DevPair* dp, Monitor* m)
         int dir = (cur->mx + (cur->mw / 2)) - (tar->mx + (tar->mw / 2));
         tar2 = dirtomon(dp, -dir);
         
-        if(getrootptr(dp, &x, &y) && recttomon(dp, x, y, 1, 1) != cur)
+        if(getrootptr(dp, &x, &y) && (recttomon(dp, x, y, 1, 1) != cur || dp->move.c))
         {
             if(cur->showbar)
                 if(cur->topbar)
@@ -2608,7 +2615,6 @@ setselmon(DevPair* dp, Monitor* m)
         arrange(cur);
         
         XSync(dpy, False);
-        forcing_focus = 0;
     }
 
     if (dp->selmon) {
@@ -2630,6 +2636,15 @@ setselmon(DevPair* dp, Monitor* m)
         dp->selmon->devices++;
     }
 
+    if(forcing_focus)
+    {
+        while (XCheckTypedEvent(dpy, GenericEvent, &ev)) {
+            if (legacyhandler[ev.type])
+                legacyhandler[ev.type](&ev); /* call handler */
+        }
+        forcing_focus = 0;
+    }
+    
     drawbars();
 }
 
@@ -2947,7 +2962,7 @@ toggleautoswapmon(DevPair* dp, __attribute__((unused)) const Arg * arg)
         XIWarpPointer(dpy, dp->mptr->info.deviceid, None, None, 0, 0, 0, 0, dp->selmon->wx - fake_tar->wx, (dp->selmon->wy + cur_bar_offset) - (fake_tar->wy + tar_bar_offset));
     }
     
-    setselmon(dp, dp->selmon);
+    drawbar(dp->selmon);
 }
 
 void
