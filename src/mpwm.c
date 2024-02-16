@@ -245,7 +245,7 @@ static void unmanage(Client *c, int destroyed);
 static void showhide(Client *c);
 static void updatesizehints(Client *c);
 static void updatetitle(Client *c);
-static void updatewindowtype(Client *c);
+static int updatewindowtype(Client *c);
 static void updatewmhints(Client* c);
 static void pop(DevPair* dp, Client* c);
 
@@ -1675,14 +1675,16 @@ manage(Window w, XWindowAttributes *wa)
     c->y = MAX(c->y, c->mon->wy);
     c->bw = borderpx;
 
-    wc.border_width = c->bw;
-    XConfigureWindow(dpy, w, CWBorderWidth, &wc);
-    XSetWindowBorder(dpy, w, cur_scheme[SchemeNorm][ColBorder].pixel);
-    configure(c); /* propagates border_width, if size doesn't change */
-    updatewindowtype(c);
+    if(!updatewindowtype(c))
+    {
+        wc.border_width = c->bw;
+        XConfigureWindow(dpy, w, CWBorderWidth, &wc);
+        XSetWindowBorder(dpy, w, cur_scheme[SchemeNorm][ColBorder].pixel);
+        configure(c); /* propagates border_width, if size doesn't change */
+    }
+
     updatesizehints(c);
     updatewmhints(c);
-    XSelectInput(dpy, w, PropertyChangeMask|StructureNotifyMask);
 
     for (dp = devpairs; dp; dp = dp->next)
         grabbuttons(dp->mptr, c, 0);
@@ -1695,9 +1697,7 @@ manage(Window w, XWindowAttributes *wa)
     attachstack(c);
 
     XChangeProperty(dpy, root, netatom[NetClientList], XA_WINDOW, 32, PropModeAppend, (unsigned char *) &(c->win), 1);
-    //XMoveResizeWindow(dpy, c->win, c->x + 2 * sw, c->y, c->w, c->h); /* some windows require this, should be fixed with dirty_resize */
     setclientstate(c, NormalState);
-    XMapWindow(dpy, c->win);
 
     XSync(dpy, False);
 
@@ -1711,6 +1711,8 @@ manage(Window w, XWindowAttributes *wa)
     }
 
     setfloating(c, c->isfloating, 1, 0);
+    XSelectInput(dpy, w, PropertyChangeMask|StructureNotifyMask);
+    XMapWindow(dpy, c->win);
 
     if(!c->isfloating && !c->isfullscreen)
         arrange(c->mon);
@@ -2149,12 +2151,14 @@ recttomon(DevPair* dp, int x, int y, int w, int h)
 void
 resize(Client *c, int x, int y, int w, int h, int interact)
 {
-    DBG("+resize %lu %d, %d, %d, %d\n", c->win, x, y, w, h);
+    DBG("+resize %lu %d, %d, %d, %d", c->win, x, y, w, h);
     if (applysizehints(c, &x, &y, &w, &h, interact) || c->dirty_resize)
     {
         c->dirty_resize = False;
         resizeclient(c, x, y, w, h);
+        DBG(" -> resizeclient");
     }
+    DBG("\n");
 }
 
 void
@@ -2267,7 +2271,12 @@ sendmon(DevPair* dp, Client* c, Monitor* m, int refocus)
         arrange(m);
     }
     else if(c->isfullscreen)
+    {
+        if(c->dirty_resize)
+            arrange(prev_m);
+        c->dirty_resize = False;
         resizeclient(c, c->mon->mx, c->mon->my, c->mon->mw, c->mon->mh);
+    }
     else if(dp->move.c != c && dp->resize.c != c && c->isfloating)
         resizeclient(c, m->mx, m->my, c->w, c->h);
 }
@@ -2337,14 +2346,16 @@ setfullscreen(Client *c, int fullscreen)
     {
         XChangeProperty(dpy, c->win, netatom[NetWMState], XA_ATOM, 32, PropModeReplace, (unsigned char*)&netatom[NetWMFullscreen], 1);
         c->isfullscreen = 1;
+        c->dirty_resize = True;
         c->oldstate = c->isfloating;
         c->oldbw = c->bw;
         c->bw = 0;
         c->isfloating = 1;
         resizeclient(c, c->mon->mx, c->mon->my, c->mon->mw, c->mon->mh);
         wc.stack_mode = Above;
+        wc.border_width = c->bw;
         wc.sibling = floating_stack_helper;
-        XConfigureWindow(dpy, c->win, CWSibling|CWStackMode, &wc);
+        XConfigureWindow(dpy, c->win, CWSibling|CWStackMode|CWBorderWidth, &wc);
         // no need to arrange, fullscreen window is above everything anyway
     }
     else if (!fullscreen && c->isfullscreen)
@@ -2380,13 +2391,15 @@ setfloating(Client *c, int floating, int force, int should_arrange)
     if (floating && (!c->isfloating || force))
     {
         c->isfloating = 1;
-        resize(c, c->x, c->y, c->w, c->h, 0);
         wc.stack_mode = Above;
         wc.sibling = floating_stack_helper;
         XConfigureWindow(dpy, c->win, CWSibling|CWStackMode, &wc);
 
         if(should_arrange)
+        {
+            resize(c, c->x, c->y, c->w, c->h, 0);
             arrange(c->mon);
+        }
     }
     else if (!floating && (c->isfloating || force))
     {
@@ -2477,7 +2490,8 @@ setsel(DevPair* dp, Client* c)
     
     if (dp->sel) {
         dp->sel->devices--;
-        XSetWindowBorder(dpy, dp->sel->win, cur_scheme[CLAMP(SchemeNorm + dp->sel->devices, SchemeNorm, SchemeSel3)][ColBorder].pixel);
+        if(!updatewindowtype(dp->sel))
+            XSetWindowBorder(dpy, dp->sel->win, cur_scheme[CLAMP(SchemeNorm + dp->sel->devices, SchemeNorm, SchemeSel3)][ColBorder].pixel);
         for (tdp = &dp->sel->devstack; *tdp && *tdp != dp; tdp = &(*tdp)->fnext);
         *tdp = dp->fnext;
         dp->fnext = NULL;
@@ -2488,7 +2502,8 @@ setsel(DevPair* dp, Client* c)
 
     if (dp->sel) {
         dp->sel->devices++;
-        XSetWindowBorder(dpy, dp->sel->win, cur_scheme[CLAMP(SchemeNorm + dp->sel->devices, SchemeNorm, SchemeSel3)][ColBorder].pixel);
+        if(!updatewindowtype(dp->sel))
+            XSetWindowBorder(dpy, dp->sel->win, cur_scheme[CLAMP(SchemeNorm + dp->sel->devices, SchemeNorm, SchemeSel3)][ColBorder].pixel);
         for (ndp = dp->sel->devstack; ndp && ndp->fnext; ndp = ndp->fnext);
         if (ndp)
             ndp->fnext = dp;
@@ -2908,7 +2923,7 @@ toggleautoswapmon(DevPair* dp, __attribute__((unused)) const Arg * arg)
         forcedfocusmon = dp->selmon;
     }
 
-    if(dp->sel)
+    if(dp->sel && !updatewindowtype(dp->sel))
         XSetWindowBorder(dpy, dp->sel->win, cur_scheme[CLAMP(SchemeNorm + dp->sel->devices, SchemeNorm, SchemeSel3)][ColBorder].pixel);
     
     if(getrootptr(dp, &x, &y) && (fake_tar = recttomon(dp, x, y, 1, 1)) != dp->selmon)
@@ -3422,16 +3437,29 @@ updatetitle(Client *c)
         strcpy(c->name, broken);
 }
 
-void
+/*
+ * return 1 when window is a special type
+*/
+int
 updatewindowtype(Client *c)
 {
+    int ret = 0;
     Atom state = getatomprop(c, netatom[NetWMState]);
     Atom wtype = getatomprop(c, netatom[NetWMWindowType]);
 
     if (state == netatom[NetWMFullscreen])
+    {
         setfullscreen(c, 1);
+        ret = 1;
+    }
+
     if (wtype == netatom[NetWMWindowTypeDialog])
+    {
         setfloating(c, 1, 0, 1);
+        ret = 1;
+    }
+
+    return ret;
 }
 
 void
