@@ -1181,6 +1181,7 @@ focus(DevPair* dp, Client *c)
         grabbuttons(dp->mptr, c, 1);
         setfocus(dp, c);
 
+        // make sure focused window goes over other floating windows
         if(c->isfloating)
         {
             wc.stack_mode = Above;
@@ -3203,6 +3204,7 @@ updatebars(void)
         XISelectEvents(dpy, m->barwin, &ptrevm, 1);
     }
 
+    // create invisible window that acts as a layer between tiled and floating windows
     floating_stack_helper = XCreateSimpleWindow(dpy, root, 0, 0, 1, 1, 0, 0, 0);
 
     wc.stack_mode = Above;
