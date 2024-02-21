@@ -374,7 +374,9 @@ static XIEventMask ptrevm = { .deviceid = -1, .mask_len = sizeof(ptrmask), .mask
 static XIEventMask kbdevm = { .deviceid = -1, .mask_len = sizeof(kbdmask), .mask = kbdmask };
 static Device deviceslots[MAXDEVICES] = {0};
 
-static int forcing_focus = 0;
+/* locks to prevent infinite recursion */
+static int forcing_focus = 0, arranging_clients = 0;
+
 int log_fd = 2;
 
 /* configuration, allows nested code to access above variables */
@@ -455,6 +457,13 @@ applysizehints(Client *c, int * __restrict x, int * __restrict y, int * __restri
 void
 arrange(Monitor* m)
 {
+    XEvent ev;
+
+    if(arranging_clients)
+        return;
+
+    arranging_clients = 1;
+
     DBG("+arrange\n");
 
     if (m)
@@ -468,6 +477,15 @@ arrange(Monitor* m)
     else
         for (m = mons; m; m = m->next)
             arrangemon(m);
+
+    if(arranging_clients)
+    {
+        while (XCheckTypedEvent(dpy, GenericEvent, &ev)) {
+            if (legacyhandler[ev.type])
+                legacyhandler[ev.type](&ev); /* call handler */
+        }
+        arranging_clients = 0;
+    }
 }
 
 void
@@ -1090,7 +1108,7 @@ xi2enter(void *ev)
     if ((e->mode != XINotifyNormal || e->detail == XINotifyInferior) && e->event != root)
         return;
 
-    if(forcing_focus)
+    if(forcing_focus || arranging_clients)
         return;
 
     DBG("+xi2enter %lu\n", e->event);
