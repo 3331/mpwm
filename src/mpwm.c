@@ -1743,6 +1743,8 @@ manage(Window w, XWindowAttributes *wa)
 
     if(!c->isfloating && !c->isfullscreen)
         arrange(c->mon);
+    else
+        resize(c, c->x, c->y, c->w, c->h, 0);
 
     if(!c->isfloating)
         focus(spawndev, NULL);
@@ -2454,6 +2456,7 @@ setlayout(DevPair* dp, const Arg *arg)
         arrange(dp->selmon);
     else
         drawbar(dp->selmon);
+    drawbar(dp->selmon);
 }
 
 /* arg > 1.0 will set mfact absolutely */
