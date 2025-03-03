@@ -1,6 +1,7 @@
 /* See LICENSE file for copyright and license details. */
 
 /* appearance */
+#include <X11/X.h>
 static const unsigned int borderpx  = 2;        /* border pixel of windows */
 static const int bhgappx            = 2;        /* gap between top bar and clients */
 static const int gappx              = 0;        /* gap amount in pixels between clients */
@@ -53,11 +54,12 @@ static const Layout layouts[] = {
 
 /* key definitions */
 #define MODKEY Mod1Mask
+#define MODKEY2 LockMask
 #define TAGKEYS(KEY,TAG) \
-    { MODKEY,                       KEY,      view,           {.ui = 1 << TAG} }, \
-    { MODKEY|ControlMask,           KEY,      toggleview,     {.ui = 1 << TAG} }, \
-    { MODKEY|ShiftMask,             KEY,      tag,            {.ui = 1 << TAG} }, \
-    { MODKEY|ControlMask|ShiftMask, KEY,      toggletag,      {.ui = 1 << TAG} },
+    { MODKEY2,                       KEY,      view,           {.ui = 1 << TAG} }, \
+    { MODKEY2|ControlMask,           KEY,      toggleview,     {.ui = 1 << TAG} }, \
+    { MODKEY2|ShiftMask,             KEY,      tag,            {.ui = 1 << TAG} }, \
+    { MODKEY2|ControlMask|ShiftMask, KEY,      toggletag,      {.ui = 1 << TAG} },
 
 /* commands */
 static char dmenumon[2] = "0"; /* component of dmenucmd, manipulated in spawn() */
