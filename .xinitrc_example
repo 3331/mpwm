@@ -1,0 +1,71 @@
+#!/bin/sh
+
+USER_RESOURCES=$HOME/.Xresources
+USER_MODMAP=$HOME/.Xmodmap
+
+SYS_RESOURCES=/etc/X11/xinit/.Xresources
+SYS_MODMAP=/etc/X11/xinit/.Xmodmap
+
+#/usr/libexec/xdg-desktop-portal -r &
+
+# turn off the cpu default bell
+if [ -f /usr/bin/xset ]; then
+    xset -b
+fi
+
+# merge in defaults and keymaps
+if [ -f $SYS_RESOURCES ]; then
+    xrdb -merge $SYS_RESOURCES
+fi
+
+if [ -f "$USER_RESOURCES" ]; then
+    xrdb -merge "$USER_RESOURCES"
+fi
+
+if [ -f $SYS_MODMAP ]; then
+    xmodmap $SYS_MODMAP
+fi
+
+if [ -f $USER_MODMAP ]; then
+    xmodmap $USER_MODMAP
+fi
+
+# start some nice programs
+if [ -d /etc/X11/xinit/xinitrc.d ] ; then
+    for f in /etc/X11/xinit/xinitrc.d/?*.sh ; do
+        # shellcheck source=/dev/null
+        [ -x "$f" ] && . "$f"
+    done
+    unset f
+fi
+
+# set background color
+if [ -f /usr/bin/hsetroot ]; then
+    hsetroot -solid '#000000'
+fi
+
+# enable window compositing
+if [ -f /usr/bin/picom ]; then
+    picom --xrender-sync-fence &
+fi
+
+# setup dbus environment
+if [ -f /usr/bin/dbus-update-activation-environment ]; then
+  dbus-update-activation-environment --systemd DISPLAY
+  eval "$(dbus-launch --sh-syntax --exit-with-session)"
+  export SSH_AUTH_SOCK
+fi
+
+if [ -f /usr/libexec/xdg-desktop-portal-gtk ]; then
+    export GTK_THEME=Adwaita:dark
+fi
+
+# update clock on mpwm status bar
+while xsetroot -name "`date` `uptime | sed 's/.*,//'`"
+do
+    sleep 1
+done &
+
+if [ -f /usr/local/bin/mpwm ]; then
+    exec mpwm
+fi

@@ -2,6 +2,7 @@
 
 /* appearance */
 static const unsigned int borderpx  = 2;        /* border pixel of windows */
+static const int bhgappx            = 2;        /* gap between top bar and clients */
 static const int gappx              = 0;        /* gap amount in pixels between clients */
 static const int snap               = 5;        /* snap pixel */
 static const int rmaster            = 0;        /* 1 means master-area is initially on the right */
@@ -17,9 +18,9 @@ static const char col_gray4[]       = "#eeeeee";
 static const char col_cyan[]        = "#0066AA";
 static const char col_green[]       = "#88AA00";
 static const char col_red[]         = "#AA4444";
-static const char col_ff_cyan[]        = "#003380";
-static const char col_ff_green[]       = "#33AA22";
-static const char col_ff_red[]         = "#AA1111";
+static const char col_ff_cyan[]     = "#003380";
+static const char col_ff_green[]    = "#33AA22";
+static const char col_ff_red[]      = "#AA1111";
 static const char *colors[][5]      = {
     /*               fg         bg         border     border+1    border+2 */
     [SchemeNorm]  = { col_gray3, col_gray1, col_gray2 },

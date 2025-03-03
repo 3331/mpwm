@@ -62,7 +62,6 @@
 #define INTERSECT(x,y,w,h,m)    (MAX(0, MIN((x)+(w),(m)->wx+(m)->ww) - MAX((x),(m)->wx)) \
                                * MAX(0, MIN((y)+(h),(m)->wy+(m)->wh+((m)->showbar ? ((m)->topbar ? 0 : bh) : 0)) - MAX((y),(m)->wy-((m)->showbar ? ((m)->topbar ? bh : 0) : 0))))
 #define ISVISIBLE(C)            ((C->tags & C->mon->tagset[C->mon->seltags]))
-#define LENGTH(X)               (sizeof(X) / sizeof(X[0]))
 #define MOUSEMASK               (BUTTONMASK|PointerMotionMask)
 #define WIDTH(X)                ((X)->w + 2 * (X)->bw)
 #define HEIGHT(X)               ((X)->h + 2 * (X)->bw)
@@ -781,11 +780,14 @@ configurenotify(XEvent *e)
     XConfigureEvent *ev = &e->xconfigure;
     int dirty;
 
+    DBG("+configurenotify\n");
+
     /* TODO: updategeom handling sucks, needs to be simplified */
     if (ev->window == root) {
         dirty = (sw != ev->width || sh != ev->height);
         sw = ev->width;
         sh = ev->height;
+        DBG("NEW sw: %d, sh: %d\n", sw, sh);
         if (updategeom(NULL) || dirty) {
             drw_resize(drw, sw, bh);
             updatebars();
@@ -1028,7 +1030,7 @@ drawbar(Monitor* m)
     if (m->devices) {
         drw_setscheme(drw, cur_scheme[SchemeNorm]);
         sw = TEXTW(stext) - lrpad + 2; /* 2px right padding */
-        drw_text(drw, m->ww - sw, 0, sw, bh, 0, stext, 0);
+        drw_text(drw, m->ww - sw, 0, sw, bh-bhgappx, 0, stext, 0);
     }
 
     for (c = m->clients; c; c = c->next) {
@@ -1040,7 +1042,7 @@ drawbar(Monitor* m)
     for (i = 0; i < LENGTH(tags); i++) {
         w = TEXTW(tags[i]);
         drw_setscheme(drw, cur_scheme[m->tagset[m->seltags] & 1 << i ? CLAMP(SchemeNorm + m->devices, SchemeNorm, SchemeSel3) : SchemeNorm]);
-        drw_text(drw, x, 0, w, bh, lrpad / 2, tags[i], urg & 1 << i);
+        drw_text(drw, x, 0, w, bh-bhgappx, lrpad / 2, tags[i], urg & 1 << i);
         if (occ & 1 << i) {
             for (dp = m->devstack; dp && !selt; dp = dp->mnext) {
                 selt |= dp->sel ? dp->sel->tags : 0;
@@ -1053,12 +1055,12 @@ drawbar(Monitor* m)
     }
     w = TEXTW(m->ltsymbol);
     drw_setscheme(drw, cur_scheme[SchemeNorm]);
-    x = drw_text(drw, x, 0, w, bh, lrpad / 2, m->ltsymbol, 0);
+    x = drw_text(drw, x, 0, w, bh-bhgappx, lrpad / 2, m->ltsymbol, 0);
 
     /*
      * 1  2  3  4  5  6  7  8  9  []=  [dev01,dev02] user@vm01: ~/Downloads | [dev03] user@vm01: ~
     */
-    if ((w = m->ww - sw - x) > bh) {
+    if ((w = m->ww - sw - x) > (bh-bhgappx)) {
         focus_text[0] = 0;
         for (c = m->clients, i = 0; c; c = c->next) {
             if (!c->devices)
@@ -1076,16 +1078,16 @@ drawbar(Monitor* m)
         }
         if (m->devstack) {
             drw_setscheme(drw, cur_scheme[CLAMP(SchemeNorm + m->devices, SchemeNorm, SchemeSel3)]);
-            drw_text(drw, x, 0, w, bh, lrpad / 2, focus_text, 0);
+            drw_text(drw, x, 0, w, bh-bhgappx, lrpad / 2, focus_text, 0);
         }
         else {
             drw_setscheme(drw, cur_scheme[SchemeNorm]);
-            drw_rect(drw, x, 0, w, bh, 1, 1);
-            drw_text(drw, x, 0, w, bh, lrpad / 2, "", 0);
+            drw_rect(drw, x, 0, w, bh-bhgappx, 1, 1);
+            drw_text(drw, x, 0, w, bh-bhgappx, lrpad / 2, "", 0);
         }
     }
     
-    drw_map(drw, m->barwin, 0, 0, m->ww, bh);
+    drw_map(drw, m->barwin, 0, 0, m->ww, bh-bhgappx);
 }
 
 void
@@ -2131,7 +2133,7 @@ propertynotify(XEvent *e)
     else if (ev->state == PropertyDelete)
         return; /* ignore */
     else if ((c = wintoclient(ev->window))) {
-        DBG("+propertynotify %lu %lu\n", ev->window, ev->atom);
+        DBG("+propertynotify %lu %lu (root: %lu)\n", ev->window, ev->atom, root);
         switch(ev->atom) {
         default: break;
         case XA_WM_TRANSIENT_FOR:
@@ -3257,9 +3259,21 @@ int
 updategeom(DevPair* dp)
 {
     int dirty = 0;
+    int found_active_xinerama = 0;
 
 #ifdef XINERAMA
-    if (XineramaIsActive(dpy)) {
+    // some times XineramaIsActive is not ready yet, maybe sleeping a bit helps...
+    for(int i = 0; i < 10; i++)
+    {
+        if(XineramaIsActive(dpy)) {
+            found_active_xinerama = 1;
+            break;
+        }
+        sleep(1);
+    }
+    
+    if (found_active_xinerama) {
+        DBG("XineramaIsActive sw: %d, sh: %d\n", sw, sh);
         int i, j, n, nn;
         Client *c;
         Monitor *m;
@@ -3280,6 +3294,7 @@ updategeom(DevPair* dp)
 
         /* new monitors if nn > n */
         for (i = n; i < nn; i++) {
+            DBG("added %d\n", i);
             insertmon(mons_end, createmon());
         }
 
@@ -3294,12 +3309,14 @@ updategeom(DevPair* dp)
                 m->my = m->wy = unique[i].y_org;
                 m->mw = m->ww = unique[i].width;
                 m->mh = m->wh = unique[i].height;
+                DBG("updated mon(%d) sizes: %d, %d, %d, %d\n", i, m->mx, m->my, m->mw, m->mh);
                 updatebarpos(m);
             }
         }
 
         /* removed monitors if n > nn */
         for (i = nn; i < n; i++) {
+            DBG("removed %d\n", i);
             while ((c = m->clients)) {
                 dirty = 1;
                 mons_end->clients = c->next;
@@ -3317,6 +3334,7 @@ updategeom(DevPair* dp)
     } else
 #endif /* XINERAMA */
     { /* default monitor setup */
+        DBG("NOT XineramaIsActive sw: %d, sh: %d\n", sw, sh);
         if (!mons) {
             insertmon(mons_end, createmon());
         }
@@ -3664,7 +3682,7 @@ setup(void)
     if (!drw_fontset_create(drw, fonts, LENGTH(fonts)))
         die("no fonts could be loaded.");
     lrpad = drw->fonts->h;
-    bh = drw->fonts->h + 2;
+    bh = drw->fonts->h + 2 + bhgappx;
     updategeom(NULL);
     /* init atoms */
     utf8string = Dbg_XInternAtom(dpy, "UTF8_STRING", False);
