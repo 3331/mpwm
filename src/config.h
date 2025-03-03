@@ -54,12 +54,11 @@ static const Layout layouts[] = {
 
 /* key definitions */
 #define MODKEY Mod1Mask
-#define MODKEY2 LockMask
 #define TAGKEYS(KEY,TAG) \
-    { MODKEY2,                       KEY,      view,           {.ui = 1 << TAG} }, \
-    { MODKEY2|ControlMask,           KEY,      toggleview,     {.ui = 1 << TAG} }, \
-    { MODKEY2|ShiftMask,             KEY,      tag,            {.ui = 1 << TAG} }, \
-    { MODKEY2|ControlMask|ShiftMask, KEY,      toggletag,      {.ui = 1 << TAG} },
+    { MODKEY,                       KEY,      view,           {.ui = 1 << TAG} }, \
+    { MODKEY|ControlMask,           KEY,      toggleview,     {.ui = 1 << TAG} }, \
+    { MODKEY|ShiftMask,             KEY,      tag,            {.ui = 1 << TAG} }, \
+    { MODKEY|ControlMask|ShiftMask, KEY,      toggletag,      {.ui = 1 << TAG} },
 
 /* commands */
 static char dmenumon[2] = "0"; /* component of dmenucmd, manipulated in spawn() */
