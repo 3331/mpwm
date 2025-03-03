@@ -1,9 +1,11 @@
 /* See LICENSE file for copyright and license details. */
 
 #include <stdint.h>
+#include <sys/param.h>
 
 #define CLAMP(X, A, B)          (MIN(MAX(A, B), MAX(X, MIN(A, B))))
 #define BETWEEN(X, A, B)        ((A) <= (X) && (X) <= (B))
+#define LENGTH(X)               (sizeof(X) / sizeof(X)[0])
 
 #ifdef DEBUG
 extern int indent;
