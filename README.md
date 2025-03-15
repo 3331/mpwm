@@ -1,5 +1,10 @@
 # mpwm - Multi Pointer Window Manager
 
+```
+apt install libx11-dev libxft-dev libxinerama-dev libxi-dev
+make
+```
+
 mpwm is based on [dwm](https://dwm.suckless.org/) and a
 fast, small, and dynamic window manager which uses xinput2
 to enable the use of multi pointer (MPX) for X.  
@@ -9,8 +14,6 @@ Currently there is no bindings for creating/managing device pairs.
 Use the tool `xinput` to manage devices for multi pointer/keyboard adventures for now.  
 
 ## Features/patches
-
-* **TODO** Split into more c files, it is currently a mess to navigate the code
 
 * Intuitive (MODKEY + TAB) behaviour
   * Cycle through stack and watch windows move around (MODKEY + TAB)

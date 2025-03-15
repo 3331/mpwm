@@ -67,5 +67,8 @@ do
 done &
 
 if [ -f /usr/local/bin/mpwm ]; then
+    if [ -f /usr/bin/dbus-run-session ]; then
+        exec /usr/bin/dbus-run-session mpwm
+    fi
     exec mpwm
 fi

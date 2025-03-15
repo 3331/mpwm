@@ -1,11 +1,8 @@
 /* See LICENSE file for copyright and license details. */
+#pragma once
 
 #include <stdint.h>
 #include <sys/param.h>
-
-#define CLAMP(X, A, B)          (MIN(MAX(A, B), MAX(X, MIN(A, B))))
-#define BETWEEN(X, A, B)        ((A) <= (X) && (X) <= (B))
-#define LENGTH(X)               (sizeof(X) / sizeof(X)[0])
 
 #ifdef DEBUG
 extern int indent;
@@ -18,11 +15,11 @@ extern int indent;
 #define DBG(...) while(0) {}
 #endif
 
-void die(const char *fmt, ...);
-void *ecalloc(size_t nmemb, size_t size);
+extern void die(const char *fmt, ...);
+extern void *ecalloc(size_t nmemb, size_t size);
 
-void swap_int(int* a, int* b);
-void swap_uint32(uint32_t* a, uint32_t* b);
-void swap_void(void** a, void** b);
-void swap_float(float* a, float* b);
-void swap_ulong(unsigned long* a, unsigned long* b);
+extern void swap_int(int *a, int *b);
+extern void swap_uint32(uint32_t *a, uint32_t *b);
+extern void swap_void(void **a, void **b);
+extern void swap_float(float *a, float *b);
+extern void swap_ulong(unsigned long *a, unsigned long *b);

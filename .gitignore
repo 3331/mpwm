@@ -1,6 +1,4 @@
 mpwm
-null.d
-.build
-.deps
+build
 .vscode*
-*.o
+.cache

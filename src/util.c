@@ -13,8 +13,7 @@ extern int log_fd;
 int indent;
 #endif
 
-void *
-ecalloc(size_t nmemb, size_t size)
+void *ecalloc(size_t nmemb, size_t size)
 {
     void *p;
 
@@ -23,8 +22,7 @@ ecalloc(size_t nmemb, size_t size)
     return p;
 }
 
-void
-die(const char *fmt, ...) {
+void die(const char *fmt, ...) {
     va_list ap;
 
     va_start(ap, fmt);
@@ -42,40 +40,35 @@ die(const char *fmt, ...) {
     exit(1);
 }
 
-inline void
-swap_float(float* a, float* b)
+void swap_float(float *a, float *b)
 {
     float tmp = *a;
     *a = *b;
     *b = tmp;
 }
 
-inline void
-swap_int(int* a, int* b)
+void swap_int(int *a, int *b)
 {
     int tmp = *a;
     *a = *b;
     *b = tmp;
 }
 
-inline void
-swap_uint32(uint32_t* a, uint32_t* b)
+void swap_uint32(uint32_t *a, uint32_t *b)
 {
     uint32_t tmp = *a;
     *a = *b;
     *b = tmp;
 }
 
-inline void
-swap_void(void** a, void** b)
+void swap_void(void **a, void **b)
 {
-    void* tmp = *a;
+    void *tmp = *a;
     *a = *b;
     *b = tmp;
 }
 
-inline void
-swap_ulong(unsigned long* a, unsigned long* b)
+void swap_ulong(unsigned long *a, unsigned long *b)
 {
     unsigned long tmp = *a;
     *a = *b;
