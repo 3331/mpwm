@@ -3,15 +3,13 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 project(mpwm C)
 
-# Set the C standard
 set(CMAKE_C_STANDARD 11)
 
-# Find packages
+# find required packages
 find_package(X11 REQUIRED)
 find_package(Freetype REQUIRED)
-
-# Find fontconfig and Xft using pkg-config
 find_package(PkgConfig REQUIRED)
+
 pkg_check_modules(FONTCONFIG REQUIRED fontconfig)
 pkg_check_modules(XFT REQUIRED xft)
 
@@ -19,7 +17,6 @@ find_library(XI_LIBRARY Xi)
 find_library(XINERAMA_LIBRARY Xinerama)
 find_library(XRENDER_LIBRARY Xrender)
 
-# Include directories
 include_directories(
     ${X11_INCLUDE_DIRS}
     ${FREETYPE_INCLUDE_DIRS}
