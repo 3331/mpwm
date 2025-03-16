@@ -1,7 +1,7 @@
 # mpwm - Multi Pointer Window Manager
 
 ```
-apt install libx11-dev libxft-dev libxinerama-dev libxi-dev
+apt install libx11-dev libxft-dev libxinerama-dev libxi-dev libjson-c-dev
 make
 ```
 
