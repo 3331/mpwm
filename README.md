@@ -2,6 +2,9 @@
 
 ```
 apt install libx11-dev libxft-dev libxinerama-dev libxi-dev libjson-c-dev
+mkdir build
+cd build
+cmake build ../
 make
 ```
 
