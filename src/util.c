@@ -40,6 +40,49 @@ void die(const char *fmt, ...) {
     exit(1);
 }
 
+char* read_file_to_buffer(const char *filename, size_t *size)
+{
+    FILE *file = fopen(filename, "rb");  // Open file in binary mode
+    if (!file) {
+        perror("Error opening file");
+        return NULL;
+    }
+
+    // Get the file size
+    fseek(file, 0, SEEK_END);  // Move to the end of the file
+    *size = ftell(file);       // Get the current position (file size)
+    fseek(file, 0, SEEK_SET);  // Move back to the beginning of the file
+
+    // We dont care about empty files
+    if(!(*size)) {
+        fclose(file);
+        return NULL;
+    }
+
+    // Allocate memory for the file content
+    char *buffer = (char*)malloc(*size + 1);  // +1 for null-terminator
+    if (!buffer) {
+        perror("Error allocating memory");
+        fclose(file);
+        return NULL;
+    }
+
+    // Read the file into the buffer
+    size_t bytesRead = fread(buffer, 1, *size, file);
+    if (bytesRead != *size) {
+        perror("Error reading file");
+        free(buffer);
+        fclose(file);
+        return NULL;
+    }
+
+    // Null-terminate the string (optional if you're dealing with binary data)
+    buffer[*size] = '\0';
+
+    fclose(file);
+    return buffer;
+}
+
 void swap_float(float *a, float *b)
 {
     float tmp = *a;

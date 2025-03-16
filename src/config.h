@@ -10,7 +10,21 @@
     { MODKEY|ShiftMask,             KEY,      tag,            {.ui = 1 << TAG} }, \
     { MODKEY|ControlMask|ShiftMask, KEY,      toggletag,      {.ui = 1 << TAG} },
 
+typedef struct Rule_t Rule;
+
+typedef struct Rule_t {
+    Rule *next;  /* next rule */
+	char *class;
+	char *instance;
+	char *title;
+	unsigned int tags;
+	int isfloating;
+    int isfullscreen;
+	int monitor;
+} Rule;
+
 typedef struct {
+    char *config_file;
     const char **fonts;
     unsigned int fonts_len;
 
@@ -18,6 +32,8 @@ typedef struct {
     int gappx;                 /* gap amount in pixels between clients */
     int bhgappx;               /* gap between top bar and clients */
     unsigned int borderpx;     /* border pixel of windows */
+
+    Rule *rules;
 } Config;
 
 extern Config gcfg;
@@ -55,3 +71,6 @@ extern const Button gbuttons[];
 extern const unsigned int gbuttons_len;
 extern const Key gkeys[];
 extern const unsigned int gkeys_len;
+
+extern void load_config(void);
+extern void unload_config(void);

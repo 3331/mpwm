@@ -116,15 +116,21 @@ void cleanup(void)
     for (m = gwm.mons; m; m = m->next)
         while (m->stack)
             unmanage(m->stack, 0);
+    
     XIUngrabKeycode(gwm.dpy, XIAllMasterDevices, XIAnyKeycode, gwm.root, ganymodifier_len, ganymodifier);
+
     while (gwm.mons)
         cleanupmon(gwm.mons);
+
     for (i = 0; i < CurLast; i++)
         drw_cur_free(gdrw, gwm.cursor[i]);
+
     for (i = 0; i < LENGTH(colors); i++)
         free(gwm.scheme[i]);
+
     for (i = 0; i < LENGTH(ff_colors); i++)
         free(gwm.ff_scheme[i]);
+
     free(gwm.ff_scheme);
     free(gwm.scheme);
     XDestroyWindow(gwm.dpy, gwm.wmcheckwin);
@@ -182,7 +188,7 @@ void __attribute__((unused)) updatedebuginfo(void)
         for (c = m->stack; c; c = c->snext) {
             DBG("    [%d%s] Client %ld (title: %s, devices: %d)\n", cn, m->stack == c ? " - STACK" : "", c->win, c->name, c->devices);
             i = 0;
-            for (dp = devpairs; dp; dp = dp->next, i++) {
+            for (dp = gwm.devpairs; dp; dp = dp->next, i++) {
                 if (dp->sel == c) {
                     DBG("        [%d] Device %d (use: %d)\n", i, i, dp->mkbd->info.use);
                 }
@@ -249,10 +255,15 @@ void setup(void)
     struct sigaction sa;
 
 #ifdef DEBUG
-    unlink("/home/user/.mpwm.log");
-    log_fd = open("/home/user/.mpwm.log", O_RDWR | O_CREAT, 0644);
+    char log_path[PATH_MAX];
+    snprintf(log_path, sizeof(log_path), "%s/.mpwm.log", getenv("HOME"));
+    unlink(log_path);
+    log_fd = open(log_path, O_RDWR | O_CREAT, 0644);
     if(log_fd == -1)
+    {
+        fprintf(stderr, "\n\nfailed to open log_fd\n\n");
         die("could not open log_fd, why not..\n");
+    }
 #endif
 
     /* do not transform children into zombies when they terminate */
@@ -345,12 +356,36 @@ void setup(void)
     initdevices();
 }
 
-int
-main(int argc, char *argv[])
+void test_config(void)
 {
+
+}
+
+int main(int argc, char *argv[])
+{
+    char* home_dir = getenv("HOME");
+    if(!home_dir)
+        die("missing HOME environment variable");
+
+    if (asprintf(&gcfg.config_file, "%s/%s", home_dir, CONFIG_FILE) == -1) {
+        perror("asprintf failed");
+        return 1;
+    }
+
     int major = 2, minor = 1;
     if (argc == 2 && !strcmp("-v", argv[1]))
         die("mpwm-" VERSION);
+    if (argc == 2 && !strcmp("-t", argv[1]))
+    {
+        printf("Testing config @ %s\n", gcfg.config_file);
+        // call it 2 times to test for leaks
+        load_config();
+        load_config();
+        unload_config();
+        free(gcfg.config_file);
+        gcfg.config_file = 0;
+        return 0;
+    }
     else if (argc != 1)
         die("usage: mpwm [-v]");
     if (!setlocale(LC_CTYPE, "") || !XSupportsLocale())
@@ -361,6 +396,7 @@ main(int argc, char *argv[])
         die("XInputExtension not available.\n");
     if (XIQueryVersion(gwm.dpy, &major, &minor) == BadRequest)
         die("XInput 2.0 not available. Server only supports %d.%d\n", major, minor);
+
     checkotherwm();
     setup();
     scan();

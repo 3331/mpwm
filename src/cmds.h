@@ -4,6 +4,7 @@
 
 /* commandable functions */
 extern void quit(DevPair *dp, const Arg *arg);
+extern void reloadconfig(DevPair *dp, const Arg *arg);
 extern void focusmon(DevPair *dp, const Arg *arg);
 extern void swapmon(DevPair *dp, const Arg *arg);
 extern void focusstack(DevPair *dp, const Arg *arg);

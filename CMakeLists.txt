@@ -9,6 +9,7 @@ set(CMAKE_C_STANDARD 11)
 find_package(X11 REQUIRED)
 find_package(Freetype REQUIRED)
 find_package(PkgConfig REQUIRED)
+find_package(json-c CONFIG)
 
 pkg_check_modules(FONTCONFIG REQUIRED fontconfig)
 pkg_check_modules(XFT REQUIRED xft)
@@ -16,6 +17,7 @@ pkg_check_modules(XFT REQUIRED xft)
 find_library(XI_LIBRARY Xi)
 find_library(XINERAMA_LIBRARY Xinerama)
 find_library(XRENDER_LIBRARY Xrender)
+find_library(JSON_C_LIBRARY json-c)
 
 include_directories(
     ${X11_INCLUDE_DIRS}
@@ -46,6 +48,7 @@ target_compile_definitions(mpwm PUBLIC
     _POSIX_C_SOURCE=2
     XINERAMA
     VERSION=\"2.0\"
+    CONFIG_FILE=\".mpwm\"
 )
 
 target_link_libraries(mpwm 
@@ -56,6 +59,7 @@ target_link_libraries(mpwm
     ${FREETYPE_LIBRARIES} 
     ${FONTCONFIG_LIBRARIES}
     ${XFT_LIBRARIES}
+    ${JSON_C_LIBRARY}
 )
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -65,5 +69,6 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
 endif()
 
 target_compile_options(mpwm PRIVATE -O3 -march=native -pedantic -Wall -Wextra)
+target_link_options(mpwm PRIVATE)
 
 install(TARGETS mpwm DESTINATION /usr/local/bin)

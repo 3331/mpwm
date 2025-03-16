@@ -16,6 +16,11 @@ void quit(__attribute__((unused)) DevPair *dp, __attribute__((unused)) const Arg
     gwm.running = 0;
 }
 
+void reloadconfig(__attribute__((unused)) DevPair *dp, __attribute__((unused)) const Arg *arg)
+{
+    load_config();
+}
+
 void focusmon(DevPair *dp, const Arg *arg)
 {
     Monitor *m;

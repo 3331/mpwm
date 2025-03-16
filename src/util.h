@@ -6,6 +6,7 @@
 
 #ifdef DEBUG
 extern int indent;
+extern int log_fd;
 #define DBG_IN(...) dprintf(log_fd, "%*s", indent*4, "");dprintf(log_fd, __VA_ARGS__);indent++;
 #define DBG_OUT(...) indent--;dprintf(log_fd, "%*s", indent*4, "");dprintf(log_fd, __VA_ARGS__);
 #define DBG(...) dprintf(log_fd, "%*s", indent*4, "");dprintf(log_fd, __VA_ARGS__);
@@ -15,8 +16,9 @@ extern int indent;
 #define DBG(...) while(0) {}
 #endif
 
-extern void die(const char *fmt, ...);
 extern void *ecalloc(size_t nmemb, size_t size);
+extern void die(const char *fmt, ...);
+extern char* read_file_to_buffer(const char *filename, size_t *size);
 
 extern void swap_int(int *a, int *b);
 extern void swap_uint32(uint32_t *a, uint32_t *b);

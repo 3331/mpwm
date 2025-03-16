@@ -5,6 +5,42 @@
 #include "monitor.h"
 #include "resolvers.h"
 
+/* function implementations */
+void applyrules(Client *c)
+{
+	const char *class, *instance;
+	Rule *r;
+	Monitor *m;
+	XClassHint ch = { NULL, NULL };
+
+	/* rule matching */
+	c->isfloating = 0;
+	c->tags = 0;
+	XGetClassHint(gwm.dpy, c->win, &ch);
+	class    = ch.res_class ? ch.res_class : "broken";
+	instance = ch.res_name  ? ch.res_name  : "broken";
+
+	for (r = gcfg.rules; r; r = r->next) {
+		if ((!r->title || strstr(c->name, r->title))
+		&& (!r->class || strstr(class, r->class))
+		&& (!r->instance || strstr(instance, r->instance)))
+		{
+            DBG("found rule for %s:%s:%s, %d, %d, %d, %d\n", r->title, r->class, r->instance, r->tags, r->isfloating, r->isfullscreen, r->monitor);
+			c->isfloating = r->isfloating;
+			c->isfullscreen = r->isfullscreen;
+			c->tags |= r->tags;
+			for (m = gwm.mons; m && m->num != r->monitor; m = m->next);
+			if (m)
+				c->mon = m;
+		}
+	}
+	if (ch.res_class)
+		XFree(ch.res_class);
+	if (ch.res_name)
+		XFree(ch.res_name);
+	c->tags = c->tags & TAGMASK ? c->tags & TAGMASK : c->mon->tagset[c->mon->seltags];
+}
+
 void manage(Window w, XWindowAttributes *wa)
 {
     Client *c, *t = NULL;
@@ -13,6 +49,7 @@ void manage(Window w, XWindowAttributes *wa)
     DevPair *dp;
     Clr **cur_scheme;
     int window_type;
+    int apply_rules = 0;
 
     DBG("+manage %lu\n", w);
 
@@ -40,6 +77,7 @@ void manage(Window w, XWindowAttributes *wa)
         c->mon = gwm.spawnmon ? gwm.spawnmon : gwm.spawndev->selmon;
         c->tags = c->mon->tagset[c->mon->seltags];
         gwm.spawnmon = NULL;
+        apply_rules = 1;
     } else {
         die("could not find monitor for client\n");
     }
@@ -64,6 +102,8 @@ void manage(Window w, XWindowAttributes *wa)
 
     updatesizehints(c);
     updatewmhints(c);
+    if(apply_rules)
+        applyrules(c);
 
     for (dp = gwm.devpairs; dp; dp = dp->next)
         grabbuttons(dp->mptr, c, 0);
