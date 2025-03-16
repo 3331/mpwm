@@ -1,0 +1,21 @@
+{
+    "rules": {
+        "discord floating fix": {
+            "class": "discord",
+            "instance": null,
+            "title": null,
+            "tags": 0,
+            "isfloating": false,
+            "isfullscreen": false
+        },
+        "vscodium floating fix": {
+            "class": "VSCodium",
+            "isfloating": false
+        },
+        "IDA floating fix": {
+            "class": "IDA",
+            "instance": null,
+            "isfloating": false
+        }
+    }
+}
