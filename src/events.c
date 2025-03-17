@@ -9,6 +9,7 @@
 #include "resolvers.h"
 #include "drw.h"
 
+#include <X11/extensions/XI2.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -632,13 +633,13 @@ void xi2hierarchychanged(void *ev)
 
         if (e->info[i].flags & XISlaveDetached) {
             if (!(dp = getdevpair(deviceslots[idx].info.attachment)))
-                die("could not find device pair for slave device\n");
+                die("could not find device pair for slave device %d\n", deviceslots[idx].info.attachment);
             for (pd = &dp->slaves; *pd && *pd != &deviceslots[idx]; pd = &(*pd)->snext);
             *pd = deviceslots[idx].snext;
             deviceslots[idx].self = NULL;
             deviceslots[idx].snext = NULL;
             deviceslots[idx].sprev = NULL; /* TODO: not used yet... */
-            DBG("detach slave: %d\n", idx);
+            DBG("detach slave: %d from master %d\n", idx, deviceslots[idx].info.use == XISlavePointer ? dp->mptr->info.deviceid : dp->mkbd->info.deviceid);
         }
     }
 
@@ -652,9 +653,15 @@ void xi2hierarchychanged(void *ev)
         if (deviceslots[idx].info.use != XISlaveKeyboard && deviceslots[idx].info.use != XISlavePointer)
             continue;
         
-        if (e->info[i].flags & (XISlaveAdded | XISlaveAttached)) {
+        if (e->info[i].flags & (XISlaveAdded | XISlaveAttached) &&
+            !(e->info[i].flags & XISlaveRemoved)) {
+            deviceslots[idx].info.deviceid = e->info[i].deviceid;
+            deviceslots[idx].info.attachment = e->info[i].attachment;
+            deviceslots[idx].info.use = e->info[i].use;
+            deviceslots[idx].info.enabled = e->info[i].enabled;
+
             if (!(dp = getdevpair(deviceslots[idx].info.attachment)))
-                die("could not find device pair for slave device\n");
+                die("could not find device pair for slave device %d\n", deviceslots[idx].info.attachment);
             if (deviceslots[idx].self) {
                 for (pd = &deviceslots[idx].self->slaves; *pd && *pd != &deviceslots[idx]; pd = &(*pd)->snext);
                 *pd = deviceslots[idx].snext;
@@ -669,7 +676,7 @@ void xi2hierarchychanged(void *ev)
                 for (d = dp->slaves; d && d->snext; d = d->snext);
                 d->snext = &deviceslots[idx];
             }
-            DBG("added slave: %d\n", idx);
+            DBG("added slave: %d to master %d\n", idx, deviceslots[idx].info.use == XISlavePointer ? dp->mptr->info.deviceid : dp->mkbd->info.deviceid);
             deviceslots[idx].self = dp;
         }
     }
@@ -702,7 +709,7 @@ void xi2hierarchychanged(void *ev)
             deviceslots[idx].sprev = NULL; /* TODO: not used yet... */
         }
         
-        /* detach devpair from everything if mptr and mkbd is NULL */
+        /* detach devpair/slave from everything if mptr and mkbd is NULL */
         if(deviceslots[idx].self && !deviceslots[idx].self->mptr && !deviceslots[idx].self->mkbd)
         {
             if(deviceslots[idx].self->slaves)
