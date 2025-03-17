@@ -604,7 +604,7 @@ int sendevent(Client *c, Atom proto)
     if(!c)
         return exists;
 
-    if (XGetWMProtocols(gwm.dpy, c->w, &protocols, &n)) {
+    if (XGetWMProtocols(gwm.dpy, c->win, &protocols, &n)) {
         while (!exists && n--)
             exists = protocols[n] == proto;
         XFree(protocols);
@@ -613,12 +613,12 @@ int sendevent(Client *c, Atom proto)
         char *name = XGetAtomName(gwm.dpy, proto);
         XFree(name);
         ev.type = ClientMessage;
-        ev.xclient.window = c->w;
+        ev.xclient.window = c->win;
         ev.xclient.message_type = gwm.wmatom[WMProtocols];
         ev.xclient.format = 32;
         ev.xclient.data.l[0] = proto;
         ev.xclient.data.l[1] = CurrentTime;
-        XSendEvent(gwm.dpy, c->w, False, NoEventMask, &ev);
+        XSendEvent(gwm.dpy, c->win, False, NoEventMask, &ev);
     }
     return exists;
 }
