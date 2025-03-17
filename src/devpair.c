@@ -434,8 +434,9 @@ void setselmon(DevPair *dp, Monitor *m)
 }
 
 void focus(DevPair *dp, Client *c)
-{    
+{
     DBG("+focus %lu -> %lu\n", dp->sel ? dp->sel->win : 0, c ? c->win : 0);
+    DevPair *ndp;
 
     if(c && dp->sel == c)
         return;
@@ -465,6 +466,16 @@ void focus(DevPair *dp, Client *c)
     }
 
     setsel(dp, c);
+    /* refocus other devparis*/
+    for(ndp = dp->selmon->devstack; ndp; ndp = ndp->mnext)
+    {
+        if(dp == ndp || !ndp->sel)
+            continue;
+        c = ndp->sel;
+        unfocus(ndp, 1);
+        grabbuttons(ndp->mptr, c, 1);
+        setfocus(ndp, c);
+    }
 	drawbars();
     DBG("-focus\n");
 }
