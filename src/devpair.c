@@ -156,8 +156,9 @@ void grabdevicekeys(Device *mkbd)
     {
         unsigned int i;
         KeyCode code;
-
+        XSync(gwm.dpy, False);
         XIUngrabKeycode(gwm.dpy, kbdevm.deviceid, XIAnyKeycode, gwm.root, ganymodifier_len, ganymodifier);
+        XSync(gwm.dpy, False);
         for (i = 0; i < gkeys_len; i++) {
             if (!(code = XKeysymToKeycode(gwm.dpy, gkeys[i].keysym)))
                 continue;
@@ -167,8 +168,10 @@ void grabdevicekeys(Device *mkbd)
                 { gkeys[i].mod|gwm.numlockmask, 0 },
                 { gkeys[i].mod|gwm.numlockmask|LockMask, 0 }
             };
+            XSync(gwm.dpy, False);
             XIGrabKeycode(gwm.dpy, kbdevm.deviceid, code, gwm.root,
                 XIGrabModeAsync, XIGrabModeAsync, True, &kbdevm, LENGTH(modifiers), modifiers);
+            XSync(gwm.dpy, False);
         }
     }
 }
@@ -177,7 +180,9 @@ void grabdevicebuttons(Device *mptr)
 {
     ptrevm.deviceid = mptr->info.deviceid;
     memset(ptrmask, 0, sizeof(ptrmask));
+    XSync(gwm.dpy, False);
     XISelectEvents(gwm.dpy, gwm.root, &ptrevm, 1);
+    XSync(gwm.dpy, False);
 }
 
 void grabbuttons(Device *mptr, Client *c, int focused)
@@ -186,7 +191,9 @@ void grabbuttons(Device *mptr, Client *c, int focused)
     memset(ptrmask, 0, sizeof(ptrmask));
     XISetMask(ptrmask, XI_Enter);
     XISetMask(ptrmask, XI_FocusIn);
+    XSync(gwm.dpy, False);
     XISelectEvents(gwm.dpy, c->win, &ptrevm, 1);
+    XSync(gwm.dpy, False);
 
     ptrevm.deviceid = mptr->info.deviceid;
     memset(ptrmask, 0, sizeof(ptrmask));
@@ -197,12 +204,17 @@ void grabbuttons(Device *mptr, Client *c, int focused)
     updatenumlockmask();
     {
         unsigned int i;
+        XSync(gwm.dpy, False);
         XIUngrabButton(gwm.dpy, ptrevm.deviceid, XIAnyButton, c->win, ganymodifier_len, ganymodifier);
+        XSync(gwm.dpy, False);
         if(!c->grabbed)
             return;
-        if (!focused)
+        if (!focused) {
+            XSync(gwm.dpy, False);
             XIGrabButton(gwm.dpy, ptrevm.deviceid, XIAnyButton, c->win, None, XIGrabModeAsync,
                 XIGrabModeAsync, False, &ptrevm, ganymodifier_len, ganymodifier);
+            XSync(gwm.dpy, False);
+        }
         for (i = 0; i < gbuttons_len; i++) {
             if (gbuttons[i].click != ClkClientWin)
                 continue;
@@ -212,8 +224,10 @@ void grabbuttons(Device *mptr, Client *c, int focused)
                 { gbuttons[i].mask|gwm.numlockmask, 0 },
                 { gbuttons[i].mask|gwm.numlockmask|LockMask, 0 }
             };
+            XSync(gwm.dpy, False);
             XIGrabButton(gwm.dpy, ptrevm.deviceid, gbuttons[i].button, c->win, None, XIGrabModeAsync,
                 XIGrabModeAsync, False, &ptrevm, LENGTH(modifiers), modifiers);
+            XSync(gwm.dpy, False);
         }
     }
 }
