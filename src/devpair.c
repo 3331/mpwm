@@ -303,6 +303,7 @@ void setsel(DevPair *dp, Client *c)
             dp->sel->devstack = dp;
         format_client_prefix_name(dp->sel);
     }
+    DBG("-setsel\n");
 }
 
 void setselmon(DevPair *dp, Monitor *m)

@@ -163,7 +163,7 @@ void unmanage(Client *c, int destroyed)
     XWindowChanges wc;
     DevPair *dp;
 
-    DBG("+unmanage %lu %d %d\n", c->win, c->isfloating, c->isfullscreen);
+    DBG("+unmanage %lu %d %d %d\n", c->win, c->isfloating, c->isfullscreen, destroyed);
 
     detach(c);
     detachstack(c);
@@ -609,6 +609,7 @@ int sendevent(Client *c, Atom proto)
             exists = protocols[n] == proto;
         XFree(protocols);
     }
+    
     if (exists) {
         char *name = XGetAtomName(gwm.dpy, proto);
         XFree(name);

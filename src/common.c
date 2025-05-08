@@ -6,6 +6,8 @@
 #include "monitor.h"
 #include "resolvers.h"
 
+#include <execinfo.h>
+
 XIGrabModifiers ganymodifier[] = { { XIAnyModifier, 0 } };
 unsigned int ganymodifier_len = LENGTH(ganymodifier);
 unsigned char hcmask[XIMaskLen(XI_HierarchyChanged)] = {0};
@@ -15,6 +17,28 @@ XIEventMask hcevm = { .deviceid = XIAllDevices, .mask_len = sizeof(hcmask), .mas
 XIEventMask ptrevm = { .deviceid = -1, .mask_len = sizeof(ptrmask), .mask = ptrmask };
 XIEventMask kbdevm = { .deviceid = -1, .mask_len = sizeof(kbdmask), .mask = kbdmask };
 
+void print_backtrace(void)
+{
+    void *buffer[1024] = {0};
+    int size;
+    
+    // Get the backtrace
+    size = backtrace(buffer, LENGTH(buffer));
+    
+    // Print the backtrace
+    char **symbols = backtrace_symbols(buffer, size);
+    
+    if (symbols == NULL) {
+        return;
+    }
+    
+    DBG("Backtrace:\n");
+    for (int i = 0; i < size; i++) {
+        DBG("  %s\n", symbols[i]);
+    }
+    
+    free(symbols);
+}
 /* There's no way to check accesses to destroyed windows, thus those cases are
  * ignored (especially on UnmapNotify's). Other types of errors call Xlibs
  * default error handler, which may call exit. */
@@ -23,6 +47,8 @@ int xerror(Display *display, XErrorEvent *ee)
     Client *c;
     // 12, 3, 8
     DBG("xerror: request code=%d, error code=%d, minor code=%d, serial=%lu, resourceid=%lu\n", ee->request_code, ee->error_code, ee->minor_code, ee->serial, ee->resourceid);
+    print_backtrace();
+
     
     if(ee->error_code == BadWindow)
     {

@@ -146,7 +146,8 @@ void incnmaster(DevPair *dp, const Arg *arg)
 
 void killclient(DevPair *dp, const Arg *arg __attribute__((unused)))
 {
-    if (!sendevent(dp->sel, gwm.wmatom[WMDelete])) {
+    DBG("+killclient\n");
+    if (dp->sel && !sendevent(dp->sel, gwm.wmatom[WMDelete])) {
         XGrabServer(gwm.dpy);
         XSetErrorHandler(xerrordummy);
         XSetCloseDownMode(gwm.dpy, DestroyAll);
@@ -155,6 +156,7 @@ void killclient(DevPair *dp, const Arg *arg __attribute__((unused)))
         XSetErrorHandler(xerror);
         XUngrabServer(gwm.dpy);
     }
+    DBG("-killclient\n");
 }
 
 void movemouse(DevPair *dp, __attribute__((unused)) const Arg *arg)

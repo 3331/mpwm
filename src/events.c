@@ -396,10 +396,7 @@ void postmoveselmon(DevPair *dp, Client *c)
     if(!c)
         return;
 
-    if(!c->isfloating)
-        return;
-    
-    if(c->isfullscreen)
+    if(c->isfullscreen || !c->isfloating)
     {
         if(!getrootptr(dp, &x, &y))
             return;
@@ -497,15 +494,9 @@ void xi2motion(void *ev)
         else if (abs((dp->selmon->wy + dp->selmon->wh) - (ny + HEIGHT(c))) < snap)
             ny = dp->selmon->wy + dp->selmon->wh - HEIGHT(c);
 
-        if (!c->isfloating && dp->selmon->lt[dp->selmon->sellt]->arrange && (abs(nx - c->x) > snap || abs(ny - c->y) > snap))
-            setfloating(c, 1, 0, 1);
-
-        if (!dp->selmon->lt[dp->selmon->sellt]->arrange || c->isfloating)
-        {
-            if(!c->isfullscreen)
-                resize(c, nx, ny, c->w, c->h, 1);
-            postmoveselmon(dp, c);
-        }
+        if(!c->isfullscreen && c->isfloating)
+            resize(c, nx, ny, c->w, c->h, 1);
+        postmoveselmon(dp, c);
     }
     else if ((c = dp->resize.c) && dp->resize.time > dp->move.time)
     {

@@ -6,6 +6,11 @@ USER_MODMAP=$HOME/.Xmodmap
 SYS_RESOURCES=/etc/X11/xinit/.Xresources
 SYS_MODMAP=/etc/X11/xinit/.Xmodmap
 
+XDG_SESSION_TYPE=x11
+export XDG_SESSION_TYPE
+DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
+export DBUS_SESSION_BUS_ADDRESS
+
 #/usr/libexec/xdg-desktop-portal -r &
 
 # turn off the cpu default bell
@@ -67,8 +72,8 @@ do
 done &
 
 if [ -f /usr/local/bin/mpwm ]; then
-    if [ -f /usr/bin/dbus-run-session ]; then
-        exec /usr/bin/dbus-run-session mpwm
-    fi
+    #if [ -f /usr/bin/dbus-run-session ]; then
+    #    exec /usr/bin/dbus-run-session mpwm
+    #fi
     exec mpwm
 fi
